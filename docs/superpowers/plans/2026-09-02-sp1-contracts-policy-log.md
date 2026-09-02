@@ -150,7 +150,7 @@ if (failures > 0) {
 console.log("no em or en dashes");
 ```
 
-Create a temporary file `tmp-dash.md` containing the single line `bad — dash` (type the real U+2014 character), then run:
+Create a temporary file `tmp-dash.md` whose single line contains an em dash (the character U+2014; on Windows type it as Alt+0151), then run:
 
 Run: `node scripts/check-no-dashes.mjs`
 Expected: exit 1 with `tmp-dash.md:1: em or en dash found`. Delete `tmp-dash.md` afterwards.
@@ -2951,7 +2951,7 @@ Then open the pull request against `main` referencing issue #1, with the accepta
 
 **Spec coverage.** Section 5.1 purity: Task 9 (no I/O, no clock; law 5). Section 5.2 descriptor fields: Task 4 schema and types. Section 5.3 two tiers, priority selection, conflict, restrictive final outcome, obligations on allow only: Tasks 8 and 9. Section 5.4 layering and load-time rejection: Task 7 (`composeBundles`, `ALLOW_GUARDED_EFFECT`, `ALLOW_LABEL_MATCHER`, `SIGNAL_RULE_ALLOWS`). Section 5.5 example: Task 7 file and Task 9 golden cases. Section 5.6 approval binding fields, nonce, single use, signer keys: Tasks 4 and 6 (single use is enforced by the daemon's `seenNonces`, which the daemon owns in sub-project 2; the verifier takes the set as input). Section 7.2 five contracts, ten event types, approval record, checkpoints: Tasks 4, 12, 14. Section 7.3 canonical bytes, digests, Ed25519, ULIDs, no floats: Tasks 2, 3, 5. Section 7.4 local SQLite with encrypted command text and a keychain-held key: Task 13 (keychain provider deferred to sub-project 2, stated in the code). Section 7.5 six signals: Task 11. Section 11 pure units, chain tamper cases, per-field approval mutations, determinism, mutation checks: Tasks 3, 6, 9, 12, 15. Gap accepted: `explain` output shape and `simulate` are not named in section 11's tests but are covered by Task 10.
 
-**Placeholder scan.** No TBD, TODO or "similar to" references; every code step shows its code; every command shows its expected result.
+**Placeholder scan.** No deferred-work markers and no "similar to" references; every code step shows its code; every command shows its expected result.
 
 **Type consistency.** `Digest` is defined once in `canonical.ts` and re-exported; `Signer`, `PublicKeyRegistry` come from `signing.ts` and are used unchanged by `approval.ts`, `chain.ts`, `verify.ts` and `checkpoint.ts`; `CompiledRule.qualified_id` is produced in Task 7 and consumed in Tasks 9 and 10; `DecisionDraft` from Task 9 is consumed by Task 10; `EventEnvelope` from Task 4 is consumed by Tasks 10, 12, 13 and 14; `GENESIS` is defined in `chain.ts` and imported by `verify.ts` and `store.ts`; the mutation anchors in Task 15 quote lines exactly as written in Tasks 3, 6, 8, 9, 12 and 13.
 
