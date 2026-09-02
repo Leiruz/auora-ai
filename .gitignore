@@ -3,7 +3,8 @@ dist/
 build/
 coverage/
 .wrangler/
-.tri/
+.tri/*
+!.tri/intent.md
 .env
 .env.*
 *.log
