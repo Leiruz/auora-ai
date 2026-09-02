@@ -121,7 +121,7 @@ import { join, relative } from "node:path";
 const ROOT = process.cwd();
 const SKIP = new Set(["node_modules", ".git", "dist", "coverage", ".wrangler"]);
 const TEXT = /\.(md|ts|mts|js|mjs|json|jsonc|yaml|yml|txt|toml)$/;
-const BAD = /[–—]/;
+const BAD = /[\u2013\u2014]/;
 
 function walk(dir, out) {
   for (const name of readdirSync(dir)) {
