@@ -19,7 +19,7 @@ This document opens with a reality check because the founder asked for one, then
 
 ### 1.1 Verdict
 
-**Technically achievable, and buildable by one person with AI coding agents**, because the hard primitives exist and are maintained by others: Anthropic's open-source sandbox-runtime for the operating-system sandboxes, the agents' own hook interfaces for interception, Cloudflare's workerd for V8 isolates, and the Cloudflare free plan for the dashboard. The honest planning basis, adopted from the adversarial reviews, is **44 to 70 focused weeks** including three feasibility gates, roughly 16 to 25 calendar months alongside NUS and the internship, to be re-estimated once the gates report; five of the seven sub-projects are new trust boundaries that need adversarial testing on three operating systems, and native Windows ships in two modes because the Windows DNS Client resolves names for every process from a shared cache and cannot attribute a lookup to the agent (section 6.3).
+**Technically achievable, and buildable by one person with AI coding agents**, because the hard primitives exist and are maintained by others: Anthropic's open-source sandbox-runtime for the operating-system sandboxes, the agents' own hook interfaces for interception, Cloudflare's workerd for V8 isolates, and the Cloudflare free plan for the dashboard. The honest planning basis, adopted from the adversarial reviews, is **46 to 73 focused weeks** including three feasibility gates, roughly 16 to 26 calendar months alongside NUS and the internship, to be re-estimated once the gates report; five of the seven sub-projects are new trust boundaries that need adversarial testing on three operating systems, and native Windows ships in two modes because the Windows DNS Client resolves names for every process from a shared cache and cannot attribute a lookup to the agent (section 6.3).
 
 **Commercially, a consumer subscription as the first business is weak.** Anthropic, OpenAI and Docker ship agent sandboxes at no charge, Microsoft covers enterprise endpoints, several MCP gateways already sell approvals, and Cloudflare, AWS and Snowflake productize cloud tool-call policy. The founder chose open-core: launch the guard and the self-hosted dashboard as open source, earn trust and adoption, and charge later for a hosted tier and team features. That is the only path this document endorses.
 
@@ -114,7 +114,7 @@ Anyone reading the package alongside this spec should know: it contradicts itsel
 | Telemetry | Metadata and digests only by default; full text in the local encrypted log; per-project opt-in for command text | Privacy promise a self-hoster can verify |
 | Architecture | TypeScript everywhere; sandbox-runtime as a library; daemon plus thin hook shims; one executable per OS | One language, maintained sandbox backends, fastest honest path |
 | OS targets | Windows, macOS and Linux from day one. Native Windows ships in 1.0 in two modes: `observed` natively (sandbox, hooks, proxy, vault, scrubbed environment; name resolution not attributable), and `protected` inside a per-run guest with its own resolver (WSL2 on Windows Home, Windows Sandbox or Hyper-V on Pro and Enterprise). Sub-project 3 opens with a feasibility gate on per-process name-resolution attribution; if it passes the corpus, native Windows is promoted to `protected` | Founder decisions after review findings F10 (first thread) and F3 (fresh thread) |
-| Effort basis | 44 to 70 focused weeks: the reviewer's 39 to 61 plus three feasibility gates, re-estimated once the gates report; roughly 16 to 25 calendar months | Founder decisions after review findings F11 (first thread) and F6 (fresh thread) |
+| Effort basis | 46 to 73 focused weeks: the reviewer's 39 to 61 plus three feasibility gates and the sub-project 1 re-estimate, re-estimated once the gates report; roughly 16 to 26 calendar months | Founder decisions after review findings F11 (first thread) and F6 (fresh thread); sub-project 1 plan review F12 |
 | Cloud plan | Everything cloud-side fits the Cloudflare free plan | Founder constraint; Dynamic Workers (paid) are not needed because isolates run locally |
 | Kernel dataplane | Dropped | Section 1.5 |
 
@@ -218,7 +218,7 @@ Within the policy tier a bundle is a list of rules with `id`, `priority`, `match
 
 ### 5.4 Layering and protection of policy
 
-Policy-tier bundles compose in order: built-in defaults, user global (`~/.auora/policy.yaml`), project (`.auora/policy.yaml`). Each bundle is identified by its digest; the effective composed digest is recorded on every decision. The sandbox denies the agent write access to policy files, hook configuration and Auora's own settings, and the daemon re-reads the agent's effective hook configuration at run start and on every event. A project bundle that attempts to match a guarded effect with `allow` is a load-time error, not a silent override; the test in section 11 supplies exactly such a bundle and expects rejection.
+Policy-tier bundles compose in order: built-in defaults, user global (`~/.auora/policy.yaml`), project (`.auora/policy.yaml`). Each bundle is identified by its digest; the effective composed digest is recorded on every decision. The sandbox denies the agent write access to policy files, hook configuration and Auora's own settings, and the daemon re-reads the agent's effective hook configuration at run start and on every event. A project bundle that attempts to match a guarded effect with `allow` is a load-time error, not a silent override, for everything that is decidable at load time: an allow rule must name its effect classes, may not name `privilege_change`, and may not match on labels or signals. Path-level and label-level guards depend on runtime facts, so they are guaranteed by construction instead: the final decision is always the more restrictive of the guard floor and the policy outcome. The test in section 11 supplies both kinds of bundle and expects rejection at load time for the first and a guard-tier deny at runtime for the second.
 
 ### 5.5 Example
 
@@ -308,7 +308,7 @@ Dropped: signed task contracts (replaced by a hashed run profile), the 25-field 
 
 ### 7.2 The five contracts
 
-Each is a JSON Schema 2020-12 document with generated TypeScript types, `additionalProperties: false` everywhere, and a `schema_version` string.
+Each is a JSON Schema 2020-12 document with generated TypeScript types, `additionalProperties: false` everywhere, and a `schema_version` string. The three fields that carry opaque agent data (hook `tool_input`, capability `args` and `data`) are validated by a recursive bounded JSON-value schema (strings and property names with length limits, safe integers only, bounded arrays and nesting) rather than a fixed shape, so schema-valid input is always canonicalizable and signable; every integer field carries the safe-integer ceiling.
 
 **`auora.action/1`** (descriptor): `action_id`, `run_id`, `seq`, `agent {kind, version}`, `source` (`hook`, `resolver`, `proxy`, `isolate`), `effect_class`, `risk_class`, `target {kind, value, scope}` where for vault requests `kind` is `http_request` with `method`, `canonical_path` and `body_digest`, `destination {domain, port, class}` (optional), `labels []`, `tool_name` (optional), `command_digest`, `argument_digest`, `run_state {counters, spend_minor, elapsed_ms, labels_read [], signals []}`, `descriptor_digest`.
 
@@ -324,7 +324,7 @@ Each is a JSON Schema 2020-12 document with generated TypeScript types, `additio
 
 ### 7.3 Canonical bytes, digests, signatures, identifiers
 
-RFC 8785 JSON Canonicalization Scheme through an existing library after schema validation; SHA-256 digests rendered as `sha256:<64 lowercase hex>`; Ed25519 signatures through Node's WebCrypto on the laptop and WebCrypto in the browser for device keys (non-extractable, generated in the installed web app at pairing); identifiers are prefixed ULIDs (`run_`, `act_`, `dec_`, `apr_`, `evt_`) treated as opaque strings. Signed material contains no floating-point numbers; spend is integer minor units.
+RFC 8785 JSON Canonicalization Scheme through the `canonicalize` reference implementation after schema validation, preceded by Auora's own validation that signed values contain only plain objects, arrays, strings in NFC, safe integers, booleans and null (this NFC rule is an Auora constraint, not part of RFC 8785); SHA-256 digests rendered as `sha256:<64 lowercase hex>`; Ed25519 signatures through Node's WebCrypto on the laptop and WebCrypto in the browser for device keys (non-extractable, generated in the installed web app at pairing); identifiers are prefixed ULIDs (`run_`, `act_`, `dec_`, `apr_`, `evt_`) treated as opaque strings. Signed material contains no floating-point numbers; spend is integer minor units.
 
 ### 7.4 Storage
 
@@ -488,7 +488,7 @@ Each sub-project gets its own spec, plan, test-first implementation, Codex cross
 
 | # | Sub-project | Delivers | Acceptance | Focused weeks |
 |---|---|---|---|---|
-| 1 | Contracts, two-tier policy engine, log | Property-tested pure core | All section 11 pure-unit tests green; example policies decide the section 5.5 cases; guard-tier override test rejects | 4 to 6 |
+| 1 | Contracts, two-tier policy engine, log | Property-tested pure core with a persisted signer, encrypted command text and an atomic approval ledger | All section 11 pure-unit tests green; example policies decide the section 5.5 cases; guard-tier override test rejects; mutation checks cover every guard | 6 to 9 |
 | 2 | Daemon with two channels, hook shims per vendor and event, desktop approvals, `auora run` observe mode | First real runs with Claude Code and Codex | Golden runs in observe mode on the founder's machine; session-scoped hook mechanism verified per CLI; hook round trip measured | 4 to 6 |
 | G1 | Feasibility gate: per-process name-resolution attribution on native Windows | Go or no-go for promoting native Windows to `protected` | Corpus including unrelated host-process interference, the DNS Client cache and the hosts file | 2 to 4 |
 | 3 | Sandbox adapter, resolver with per-OS enforcement, proxy domain policy, secret-file denial, scrubbed environment, Windows guest mode | Protected mode on Linux, macOS and the Windows guest; native Windows observed mode | Hostile corpus green in the three-OS matrix and the guest lane, DNS exfiltration, host-interference and guest default-networking tests included; coverage labels correct per OS and mode | 8 to 12 |
@@ -500,7 +500,7 @@ Each sub-project gets its own spec, plan, test-first implementation, Codex cross
 | 7 | Packaging, signing, docs site, launch | Version 1.0 | Signed installers on three OSes; docs live; gates in section 1.7 armed | 4 to 6 |
 | | Integration and evaluation across sub-projects | | Golden runs, canaries, performance budgets, mutation checks | 6 to 10 |
 
-Total 44 to 70 focused weeks including the gates; roughly 16 to 25 calendar months alongside NUS and the internship, re-estimated once the gates report. G1 opens sub-project 3, G2 and G3 precede sub-project 6. Sub-projects 3 and 4 can run in parallel once 2 is stable. A 0.9 preview for early users is possible after sub-project 4 on the operating systems and modes that pass the corpus at that point, labelled accordingly.
+Total 46 to 73 focused weeks including the gates (sub-project 1 re-estimated after its plan review); roughly 16 to 25 calendar months alongside NUS and the internship, re-estimated once the gates report. G1 opens sub-project 3, G2 and G3 precede sub-project 6. Sub-projects 3 and 4 can run in parallel once 2 is stable. A 0.9 preview for early users is possible after sub-project 4 on the operating systems and modes that pass the corpus at that point, labelled accordingly.
 
 ## 13. Risks and fallbacks
 
