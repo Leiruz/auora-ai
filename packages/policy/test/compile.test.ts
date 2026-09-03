@@ -1,0 +1,52 @@
+// packages/policy/test/compile.test.ts
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { compileLayer, compilePathPattern, composeBundles, loadLayerFile, parseBundle, PolicyCompileError } from "../src/compile.js";
+
+const EXAMPLE = fileURLToPath(new URL("../policies/example.yaml", import.meta.url));
+const DEFAULTS = fileURLToPath(new URL("../policies/defaults.yaml", import.meta.url));
+
+function code(fn: () => unknown): string {
+  try { fn(); } catch (e) { if (e instanceof PolicyCompileError) return e.code; throw e; }
+  return "OK";
+}
+
+describe("policy compiler", () => {
+  it("compiles the example and the defaults and composes them with a stable digest", () => {
+    const example = loadLayerFile(EXAMPLE, "example");
+    const defaults = loadLayerFile(DEFAULTS, "defaults");
+    expect(example.rules.map((r) => r.qualified_id)).toEqual(["example:approve-destructive-outside", "example:throttle-sends", "example:allow-github-api-pulls", "example:allow-npm-registry"]);
+    const a = composeBundles([defaults, example]);
+    const b = composeBundles([defaults, example]);
+    expect(a.digest).toBe(b.digest);
+    expect(a.ttl_ms).toBe(5000);
+    expect(a.rules).toHaveLength(defaults.rules.length + example.rules.length);
+    expect(a.rules.find((r) => r.id === "allow-github-api-pulls")?.obligations).toEqual([{ type: "record_payload_digest" }]);
+  });
+  it("gives the same layer digest whatever the rule order", () => {
+    const spec = parseBundle("version: 1\nrules:\n  - id: first\n    priority: 1\n    match: { effect: read }\n    outcome: deny\n  - id: second\n    priority: 2\n    match: { effect: send }\n    outcome: throttle\n");
+    const reversed = { ...spec, rules: [...spec.rules].reverse() };
+    expect(compileLayer(spec, "t").digest).toBe(compileLayer(reversed, "t").digest);
+  });
+  it("compiles path patterns as closed single-segment wildcards", () => {
+    const re = compilePathPattern("/repos/Leiruz/*/pulls");
+    expect(re.test("/repos/Leiruz/auora-ai/pulls")).toBe(true);
+    expect(re.test("/repos/Leiruz/a/b/pulls")).toBe(false);
+    expect(re.test("/repos/Leiruz/auora-ai/pulls/1")).toBe(false);
+    expect(code(() => compilePathPattern("/repos/**"))).toBe("INVALID_PATTERN");
+    expect(code(() => compilePathPattern("repos/x"))).toBe("INVALID_PATTERN");
+  });
+  it("rejects bad bundles with distinct codes", () => {
+    const base = parseBundle("version: 1\nrules:\n  - id: a-rule\n    priority: 1\n    match: { effect: send }\n    outcome: deny\n");
+    expect(code(() => compileLayer({ ...base, rules: [base.rules[0]!, base.rules[0]!] }, "t"))).toBe("DUPLICATE_RULE_ID");
+    expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { effect: "launch" }, outcome: "deny" }] }, "t"))).toBe("INVALID_VALUE");
+    expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { destination: "API.GitHub.com" }, outcome: "deny" }] }, "t"))).toBe("INVALID_DOMAIN");
+    expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { effect: "send", labels_any: "secret" }, outcome: "allow" }] }, "t"))).toBe("ALLOW_LABEL_MATCHER");
+    expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { effect: "send", signals_any: "scope_drift" }, outcome: "allow" }] }, "t"))).toBe("SIGNAL_RULE_ALLOWS");
+    expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { effect: "privilege_change" }, outcome: "allow" }] }, "t"))).toBe("ALLOW_GUARDED_EFFECT");
+    expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { target_scope: "workspace" }, outcome: "allow" }] }, "t"))).toBe("ALLOW_WITHOUT_EFFECT");
+    expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { effect: [ "write", "delete" ], target_scope: "workspace" }, outcome: "allow" }] }, "t"))).toBe("OK");
+    expect(code(() => parseBundle("version: 2\nrules: []\n"))).toBe("SCHEMA");
+    expect(code(() => parseBundle("version: 1\nrules:\n  - id: a-rule\n    priority: 1.5\n    match: { effect: send }\n    outcome: deny\n"))).toBe("SCHEMA");
+  });
+});

@@ -1,0 +1,30 @@
+version: 1
+ttl_ms: 5000
+rules:
+  - id: allow-workspace-read
+    priority: 20
+    description: Reads inside the workspace are the agent's normal work.
+    match: { effect: read, target_kind: path, target_scope: workspace }
+    outcome: allow
+  - id: allow-workspace-write
+    priority: 20
+    description: Writes and deletes inside the workspace; protected config paths are denied by the guard tier at runtime.
+    match: { effect: [write, delete], target_kind: path, target_scope: workspace }
+    outcome: allow
+  - id: approve-destructive-outside
+    priority: 90
+    match: { effect: delete, target_scope: outside_workspace }
+    outcome: require_approval
+  - id: approve-write-outside
+    priority: 90
+    match: { effect: write, target_scope: outside_workspace }
+    outcome: require_approval
+  - id: approve-unknown-execute
+    priority: 80
+    description: Unrecognised commands go to approval, never silently through.
+    match: { effect: execute, target_scope: unknown }
+    outcome: require_approval
+  - id: approve-read-outside
+    priority: 80
+    match: { effect: read, target_scope: [outside_workspace, system] }
+    outcome: require_approval
