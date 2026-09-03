@@ -1,3 +1,4 @@
+// packages/policy/test/helpers.ts
 import type { ActionDescriptor } from "@auora/contracts";
 
 const D = ("sha256:" + "a".repeat(64)) as ActionDescriptor["descriptor_digest"];

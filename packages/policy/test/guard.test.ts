@@ -1,3 +1,4 @@
+// packages/policy/test/guard.test.ts
 import { describe, expect, it } from "vitest";
 import { guardTier, isProtectedPath } from "../src/guard.js";
 import { descriptor } from "./helpers.js";
@@ -31,5 +32,35 @@ describe("guard tier", () => {
   it("returns null for ordinary actions", () => {
     expect(guardTier(descriptor())).toBeNull();
     expect(guardTier(descriptor({ effect_class: "send", destination: { domain: "registry.npmjs.org", port: 443, class: "allowlisted" }, target: { kind: "command", value: "npm", scope: "external" } }))).toBeNull();
+  });
+  it("matches protected paths case-insensitively", () => {
+    expect(isProtectedPath(".AUORA/policy.yaml")).toBe(true);
+    expect(isProtectedPath("C:\\Users\\z\\.Auora\\policy.yaml")).toBe(true);
+    expect(isProtectedPath(".Claude\\settings.json")).toBe(true);
+    expect(isProtectedPath("AUORA://config/daemon.toml")).toBe(true);
+  });
+  it("protects shell and PowerShell profile startup files", () => {
+    expect(isProtectedPath("home/z/.bashrc")).toBe(true);
+    expect(isProtectedPath("Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1")).toBe(true);
+    expect(isProtectedPath("src/bashrc.md")).toBe(false);
+  });
+  it("protects the .claude directory and the top-level .claude.json and .mcp.json files", () => {
+    expect(isProtectedPath(".claude/hooks/pre.sh")).toBe(true);
+    expect(isProtectedPath(".claude/agents/x.md")).toBe(true);
+    expect(isProtectedPath(".mcp.json")).toBe(true);
+    expect(isProtectedPath(".claude.json")).toBe(true);
+    expect(isProtectedPath(".claude.json.bak")).toBe(false);
+    expect(isProtectedPath("foo.claude/x")).toBe(false);
+  });
+  it("extends guard 1 to targets scoped external, without widening it for internal labels", () => {
+    const external = descriptor({ effect_class: "execute", target: { kind: "command", value: "curl", scope: "external" }, run_state: { counters: { actions: 1, sends: 0, denials: 0, approvals: 0, retries: 0 }, spend_minor: 0, elapsed_ms: 10, labels_read: ["secret"], signals: [] } });
+    expect(guardTier(external)?.reason_codes).toEqual(["GUARD_SECRET_EXFILTRATION"]);
+    const notSecret = descriptor({ effect_class: "execute", target: { kind: "command", value: "curl", scope: "external" }, run_state: { counters: { actions: 1, sends: 0, denials: 0, approvals: 0, retries: 0 }, spend_minor: 0, elapsed_ms: 10, labels_read: ["internal"], signals: [] } });
+    expect(guardTier(notSecret)).toBeNull();
+  });
+  it("covers the protected-config delete branch, a guardTier-driven URI write, and guard 4 on a local workspace read", () => {
+    expect(guardTier(descriptor({ effect_class: "delete", target: { kind: "path", value: ".auora/policy.yaml", scope: "workspace" } }))?.reason_codes).toEqual(["GUARD_PROTECTED_CONFIG"]);
+    expect(guardTier(descriptor({ effect_class: "write", target: { kind: "path", value: "auora://config/daemon.toml", scope: "workspace" } }))?.reason_codes).toEqual(["GUARD_PROTECTED_CONFIG"]);
+    expect(guardTier(descriptor({ effect_class: "read", target: { kind: "path", value: "notes.txt", scope: "workspace", attributes: ["file_payload_reference"] } }))?.reason_codes).toEqual(["GUARD_FILE_PAYLOAD_REFERENCE"]);
   });
 });
