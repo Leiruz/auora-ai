@@ -67,13 +67,19 @@ function byId(a: RuleSpec, b: RuleSpec): number {
 }
 
 export function parseBundle(text: string): BundleSpec {
-  const doc = parseDocument(text, { logLevel: "silent" });
-  if (doc.errors.length > 0) throw new PolicyCompileError("SCHEMA", doc.errors[0]!.message);
-  if (doc.warnings.length > 0) throw new PolicyCompileError("SCHEMA", doc.warnings[0]!.message);
-  const value: unknown = doc.toJS();
-  const { ajv, validate } = bundleValidator();
-  if (!validate(value)) throw new PolicyCompileError("SCHEMA", ajv.errorsText(validate.errors));
-  return value as BundleSpec;
+  try {
+    const doc = parseDocument(text, { logLevel: "error" });
+    if (doc.errors.length > 0) throw new PolicyCompileError("SCHEMA", doc.errors[0]!.message);
+    if (doc.warnings.length > 0) throw new PolicyCompileError("SCHEMA", doc.warnings[0]!.message);
+    if (doc.directives.yaml.version !== "1.2") throw new PolicyCompileError("SCHEMA", "unsupported YAML version");
+    const value: unknown = doc.toJS();
+    const { ajv, validate } = bundleValidator();
+    if (!validate(value)) throw new PolicyCompileError("SCHEMA", ajv.errorsText(validate.errors));
+    return value as BundleSpec;
+  } catch (e) {
+    if (e instanceof PolicyCompileError) throw e;
+    throw new PolicyCompileError("SCHEMA", String(e));
+  }
 }
 
 export function compileLayer(spec: BundleSpec, name: string): CompiledLayer {

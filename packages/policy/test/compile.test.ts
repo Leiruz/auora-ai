@@ -59,5 +59,10 @@ describe("policy compiler", () => {
     expect(code(() => parseBundle("version: 1\nrules:\n  - id: a-rule\n    priority: 1.5\n    match: { effect: send }\n    outcome: deny\n"))).toBe("SCHEMA");
     expect(code(() => parseBundle("version: 1\nversion: 1\nrules: []\n"))).toBe("SCHEMA");
     expect(code(() => parseBundle("version: 1\nrules: !!js/function []\n"))).toBe("SCHEMA");
+    expect(code(() => parseBundle("version: 1\nrules: []\n---\nversion: 1\nrules:\n  - id: sneaky\n    priority: 1\n    match: { effect: send }\n    outcome: allow\n"))).toBe("SCHEMA");
+    const anchorBomb = "a: &a [1,1,1,1,1,1,1,1,1]\nb: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]\nc: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]\nd: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]\ne: [*d,*d,*d,*d,*d,*d,*d,*d,*d]\n";
+    expect(code(() => parseBundle(anchorBomb))).toBe("SCHEMA");
+    expect(code(() => parseBundle("%YAML 1.1\n---\nversion: 1\nrules: []\n"))).toBe("SCHEMA");
+    expect(code(() => parseBundle("version: 1\nrules: []\n"))).toBe("OK");
   });
 });
