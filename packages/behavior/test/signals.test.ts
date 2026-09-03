@@ -20,6 +20,7 @@ describe("behavior signals", () => {
     expect(codes(computeSignals([], current({ effect_class: "send", labels_read: ["confidential"] }), profile))).toContain("sensitive_read_then_send");
     expect(codes(computeSignals([], current({ is_lookup: true, labels_read: ["secret"] }), profile))).toContain("sensitive_read_then_send");
     expect(codes(computeSignals([], current({ effect_class: "send", labels_read: ["internal"] }), profile))).not.toContain("sensitive_read_then_send");
+    expect(codes(computeSignals([], current({ effect_class: "read", is_lookup: false, labels_read: ["secret"] }), profile))).not.toContain("sensitive_read_then_send");
   });
   it("scores denial velocity in the last twenty actions with integer basis points", () => {
     const history = [1, 2, 3, 4].map((i) => entry(i, { outcome: "deny" }));
@@ -27,6 +28,8 @@ describe("behavior signals", () => {
     expect(computeSignals(history.slice(0, 2), current(), profile).find((x) => x.code === "denied_action_velocity")).toBeUndefined();
     const old = [...Array.from({ length: 4 }, (_, i) => entry(i + 1, { outcome: "deny" })), ...Array.from({ length: 20 }, (_, i) => entry(i + 5))];
     expect(codes(computeSignals(old, current(), profile))).not.toContain("denied_action_velocity");
+    const exactlyThree = [1, 2, 3].map((i) => entry(i, { outcome: "deny" }));
+    expect(computeSignals(exactlyThree, current(), profile).find((x) => x.code === "denied_action_velocity")?.basis_points).toBe(6000);
   });
   it("flags acceleration only when the last ten actions took less than half the time of the ten before", () => {
     const slow = Array.from({ length: 10 }, (_, i) => entry(i + 1, { elapsed_ms: (i + 1) * 10000 }));
@@ -39,12 +42,22 @@ describe("behavior signals", () => {
     expect(codes(computeSignals([...slow, ...slightlyFaster], current(), profile))).not.toContain("action_acceleration");
     const zeroSpanEarlier = Array.from({ length: 10 }, (_, i) => entry(i + 1, { elapsed_ms: 5000 }));
     expect(codes(computeSignals([...zeroSpanEarlier, ...fast], current(), profile))).not.toContain("action_acceleration");
+    const earlierSpan = 100000;
+    const fortyPercent = Array.from({ length: 10 }, (_, i) => entry(i + 11, { elapsed_ms: 100000 + (i + 1) * 4000 }));
+    const s2 = computeSignals([...slow, ...fortyPercent], current(), profile).find((x) => x.code === "action_acceleration");
+    expect(s2).toBeDefined();
+    expect(s2?.basis_points).toBeGreaterThan(0);
   });
   it("flags scope drift as the share of actions outside the profile's allowed scopes", () => {
     const history = [entry(1, { target_scope: "outside_workspace" }), entry(2), entry(3, { target_scope: "system" }), entry(4, { target_scope: "external" })];
     const s = computeSignals(history, current({ target_scope: "unknown" }), profile).find((x) => x.code === "scope_drift");
     expect(s?.basis_points).toBe(6000);
     expect(codes(computeSignals([entry(1), entry(2)], current(), profile))).not.toContain("scope_drift");
+    const exactlyTwoThousand = [entry(1), entry(2), entry(3), entry(4)];
+    const s2 = computeSignals(exactlyTwoThousand, current({ target_scope: "unknown" }), profile).find((x) => x.code === "scope_drift");
+    expect(s2?.basis_points).toBe(2000);
+    const justBelow = [entry(1), entry(2), entry(3), entry(4), entry(5)];
+    expect(codes(computeSignals(justBelow, current({ target_scope: "unknown" }), profile))).not.toContain("scope_drift");
   });
   it("flags the current action when it differs from the digest that was approved", () => {
     expect(codes(computeSignals([], current({ approved_digest: E }), profile))).toContain("post_approval_mutation");
