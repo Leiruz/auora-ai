@@ -26,18 +26,19 @@ export async function verifyApproval(input: unknown, ctx: ApprovalContext): Prom
   const validated = validateApproval(input);
   if (!validated.ok) return { ok: false, code: "SCHEMA_INVALID", detail: validated.errors.join("; ") };
   const record = validated.value;
-  if (record.run_id !== ctx.run_id) return { ok: false, code: "RUN_MISMATCH" };
-  if (record.action_id !== ctx.action_id) return { ok: false, code: "ACTION_MISMATCH" };
-  if (record.descriptor_digest !== ctx.descriptor_digest) return { ok: false, code: "DIGEST_MISMATCH" };
-  if (record.policy_digest !== ctx.policy_digest) return { ok: false, code: "POLICY_MISMATCH" };
-  const now = Date.parse(ctx.now);
-  if (now < Date.parse(record.issued_at) - ISSUED_AT_SKEW_MS) return { ok: false, code: "NOT_YET_VALID" };
-  if (now > Date.parse(record.expires_at)) return { ok: false, code: "EXPIRED" };
-  if (ctx.seenNonces.has(record.nonce)) return { ok: false, code: "NONCE_REUSED" };
   const key = ctx.registry.get(record.signer_key_id);
   if (!key) return { ok: false, code: "UNKNOWN_SIGNER" };
   const { signature, ...unsigned } = record;
   const valid = await verifyBytes("auora.approval/1", key, canonicalBytes(unsigned), signature);
   if (!valid) return { ok: false, code: "BAD_SIGNATURE" };
+  if (record.run_id !== ctx.run_id) return { ok: false, code: "RUN_MISMATCH" };
+  if (record.action_id !== ctx.action_id) return { ok: false, code: "ACTION_MISMATCH" };
+  if (record.descriptor_digest !== ctx.descriptor_digest) return { ok: false, code: "DIGEST_MISMATCH" };
+  if (record.policy_digest !== ctx.policy_digest) return { ok: false, code: "POLICY_MISMATCH" };
+  const now = Date.parse(ctx.now);
+  if (!Number.isFinite(now) || !Number.isFinite(Date.parse(record.issued_at)) || !Number.isFinite(Date.parse(record.expires_at))) return { ok: false, code: "SCHEMA_INVALID", detail: "unparseable timestamp" };
+  if (now < Date.parse(record.issued_at) - ISSUED_AT_SKEW_MS) return { ok: false, code: "NOT_YET_VALID" };
+  if (now > Date.parse(record.expires_at)) return { ok: false, code: "EXPIRED" };
+  if (ctx.seenNonces.has(record.nonce)) return { ok: false, code: "NONCE_REUSED" };
   return { ok: true, record };
 }
