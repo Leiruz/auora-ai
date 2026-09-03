@@ -64,4 +64,16 @@ describe("golden cases from spec section 5.5", () => {
     const first = JSON.stringify(evaluate(d, bundle));
     for (let i = 0; i < 10; i++) expect(JSON.stringify(evaluate(d, bundle))).toBe(first);
   });
+  it("keeps a higher-ranked ungated outcome as more same-priority gated rules with lower-ranked outcomes match", () => {
+    const twoGated = composeBundles([compileLayer(parseBundle("version: 1\nrules:\n  - id: always-terminate\n    priority: 10\n    match: { effect: read }\n    outcome: terminate\n  - id: gated-a\n    priority: 10\n    match: { labels_any: confidential }\n    outcome: throttle\n  - id: gated-b\n    priority: 10\n    match: { labels_any: secret }\n    outcome: require_approval\n"), "t")]);
+    const withA = evaluate(descriptor({ effect_class: "read", labels: ["confidential"] }), twoGated);
+    expect(withA.outcome).toBe("terminate"); expect(withA.matched_rule_ids).toEqual(["t:always-terminate", "t:gated-a"]);
+    const withAB = evaluate(descriptor({ effect_class: "read", labels: ["confidential", "secret"] }), twoGated);
+    expect(withAB.outcome).toBe("terminate"); expect(withAB.matched_rule_ids).toEqual(["t:always-terminate", "t:gated-a", "t:gated-b"]);
+  });
+  it("lets a matching gated deny rule beat an ungated allow rule at a higher priority", () => {
+    const lowerPriorityGate = composeBundles([compileLayer(parseBundle("version: 1\nrules:\n  - id: allow-it\n    priority: 50\n    match: { effect: read }\n    outcome: allow\n  - id: gated-deny\n    priority: 1\n    match: { labels_any: secret }\n    outcome: deny\n"), "t")]);
+    const d = evaluate(descriptor({ effect_class: "read", labels: ["secret"] }), lowerPriorityGate);
+    expect(d.outcome).toBe("deny"); expect(d.matched_rule_ids).toEqual(["t:allow-it", "t:gated-deny"]);
+  });
 });

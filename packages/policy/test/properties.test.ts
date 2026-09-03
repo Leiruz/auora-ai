@@ -73,7 +73,15 @@ describe("policy laws", () => {
       const before = rank(evaluate(d, b).outcome);
       const after = rank(evaluate({ ...d, labels: [...new Set([...d.labels, label])] }, b).outcome);
       expect(after).toBeGreaterThanOrEqual(before);
-    }));
+    }), { numRuns: 500 });
+    // Third, differently-shaped check: add a non-empty SUBSET of labels at once (not just one),
+    // so several gated rules can become newly matching in the same step.
+    fc.assert(fc.property(arbDescriptor, arbBundle, subset(["confidential", "secret"] as const, 1), (d, spec, labels) => {
+      const b = compiled(spec);
+      const before = rank(evaluate(d, b).outcome);
+      const after = rank(evaluate({ ...d, labels: [...new Set([...d.labels, ...labels])] }, b).outcome);
+      expect(after).toBeGreaterThanOrEqual(before);
+    }), { numRuns: 500 });
   });
   it("law 3: adding a behavior signal never moves a decision towards allow", () => {
     fc.assert(fc.property(arbDescriptor, arbBundle, el(SIGNAL_CODES), (d, spec, code) => {
@@ -82,7 +90,7 @@ describe("policy laws", () => {
       const signals = [...d.run_state.signals.filter((s) => s.code !== code), { code, basis_points: 10000, reason: "test" }];
       const after = rank(evaluate({ ...d, run_state: { ...d.run_state, signals } }, b).outcome);
       expect(after).toBeGreaterThanOrEqual(before);
-    }));
+    }), { numRuns: 500 });
   });
   it("law 4: no bundle lowers a guard-tier floor, and statically guarded allows are rejected at compile time", () => {
     fc.assert(fc.property(arbDescriptor, arbBundle, (d, spec) => {

@@ -65,6 +65,10 @@ export function mergeObligations(rules: readonly CompiledRule[]): Obligation[] {
   return OBLIGATION_TYPES.filter((t) => byType.has(t)).map((t) => mergedObligation(t, byType.get(t)!));
 }
 
+function isGated(m: CompiledMatcher): boolean {
+  return m.labels_any !== undefined || m.labels_read_any !== undefined || m.signals_any !== undefined;
+}
+
 interface PolicyTierResult { outcome: Outcome; reasons: string[]; top: CompiledRule[] }
 
 function policyTier(d: ActionDescriptor, rules: readonly CompiledRule[]): PolicyTierResult {
@@ -82,13 +86,12 @@ function policyTier(d: ActionDescriptor, rules: readonly CompiledRule[]): Policy
 
 export function evaluate(d: ActionDescriptor, bundle: CompiledBundle): DecisionDraft {
   const guard = guardTier(d);
-  const neutral: ActionDescriptor = { ...d, labels: [], run_state: { ...d.run_state, labels_read: [], signals: [] } };
-  const baseline = policyTier(neutral, bundle.rules);
-  const asGiven = policyTier(d, bundle.rules);
-  const policy = OUTCOME_RANK[asGiven.outcome] >= OUTCOME_RANK[baseline.outcome] ? asGiven : baseline;
-  let outcome = policy.outcome;
-  const reasons = policy.reasons;
-  let ids = policy.top.map((r) => r.qualified_id).sort();
+  const base = policyTier(d, bundle.rules.filter((r) => !isGated(r.match)));
+  const gated = bundle.rules.filter((r) => isGated(r.match) && matches(r.match, d));
+  let outcome = base.outcome;
+  for (const rule of gated) if (OUTCOME_RANK[rule.outcome] > OUTCOME_RANK[outcome]) outcome = rule.outcome;
+  const reasons = base.reasons;
+  let ids = [...base.top.map((r) => r.qualified_id).sort(), ...gated.map((r) => r.qualified_id).sort()];
   let tier: "guard" | "policy" = "policy";
   if (guard) {
     reasons.unshift(...guard.reason_codes);
@@ -98,6 +101,6 @@ export function evaluate(d: ActionDescriptor, bundle: CompiledBundle): DecisionD
       tier = "guard";
     }
   }
-  const obligations = outcome === "allow" ? mergeObligations(policy.top) : [];
+  const obligations = outcome === "allow" ? mergeObligations(base.top) : [];
   return { outcome, tier, reason_codes: reasons, matched_rule_ids: ids, obligations, policy_digest: bundle.digest, ttl_ms: bundle.ttl_ms };
 }
