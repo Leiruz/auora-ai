@@ -27,6 +27,8 @@ describe("policy compiler", () => {
     const spec = parseBundle("version: 1\nrules:\n  - id: first\n    priority: 1\n    match: { effect: read }\n    outcome: deny\n  - id: second\n    priority: 2\n    match: { effect: send }\n    outcome: throttle\n");
     const reversed = { ...spec, rules: [...spec.rules].reverse() };
     expect(compileLayer(spec, "t").digest).toBe(compileLayer(reversed, "t").digest);
+    const different = parseBundle("version: 1\nrules:\n  - id: first\n    priority: 1\n    match: { effect: read }\n    outcome: deny\n");
+    expect(compileLayer(different, "t").digest).not.toBe(compileLayer(spec, "t").digest);
   });
   it("compiles path patterns as closed single-segment wildcards", () => {
     const re = compilePathPattern("/repos/Leiruz/*/pulls");
@@ -35,6 +37,13 @@ describe("policy compiler", () => {
     expect(re.test("/repos/Leiruz/auora-ai/pulls/1")).toBe(false);
     expect(code(() => compilePathPattern("/repos/**"))).toBe("INVALID_PATTERN");
     expect(code(() => compilePathPattern("repos/x"))).toBe("INVALID_PATTERN");
+    const dot = compilePathPattern("/v1/user.json");
+    expect(dot.test("/v1/userXjson")).toBe(false);
+    expect(dot.test("/v1/user.json")).toBe(true);
+  });
+  it("assumes the caller already percent-decoded the path, so an encoded separator still matches inside a *", () => {
+    const re = compilePathPattern("/repos/Leiruz/*/pulls");
+    expect(re.test("/repos/Leiruz/a%2Fb/pulls")).toBe(true);
   });
   it("rejects bad bundles with distinct codes", () => {
     const base = parseBundle("version: 1\nrules:\n  - id: a-rule\n    priority: 1\n    match: { effect: send }\n    outcome: deny\n");
@@ -48,5 +57,7 @@ describe("policy compiler", () => {
     expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { effect: [ "write", "delete" ], target_scope: "workspace" }, outcome: "allow" }] }, "t"))).toBe("OK");
     expect(code(() => parseBundle("version: 2\nrules: []\n"))).toBe("SCHEMA");
     expect(code(() => parseBundle("version: 1\nrules:\n  - id: a-rule\n    priority: 1.5\n    match: { effect: send }\n    outcome: deny\n"))).toBe("SCHEMA");
+    expect(code(() => parseBundle("version: 1\nversion: 1\nrules: []\n"))).toBe("SCHEMA");
+    expect(code(() => parseBundle("version: 1\nrules: !!js/function []\n"))).toBe("SCHEMA");
   });
 });

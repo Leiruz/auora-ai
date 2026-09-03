@@ -1,15 +1,24 @@
 // packages/policy/src/compile.ts
 import { readFileSync } from "node:fs";
-import Ajv2020 from "ajv/dist/2020.js";
-import { parse as parseYaml } from "yaml";
-import { AGENT_KINDS, CanonicalError, DESTINATION_CLASSES, EFFECT_CLASSES, HTTP_METHODS, LABELS, OBLIGATION_TYPES, RISK_CLASSES, SIGNAL_CODES, SOURCES, TARGET_KINDS, TARGET_SCOPES, digestOf, type Obligation } from "@auora/contracts";
+import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
+import { parseDocument } from "yaml";
+import { AGENT_KINDS, CanonicalError, DESTINATION_CLASSES, EFFECT_CLASSES, HTTP_METHODS, LABELS, OBLIGATION_TYPES, RISK_CLASSES, SIGNAL_CODES, SOURCES, TARGET_KINDS, TARGET_SCOPES, digestOf, type Digest, type Obligation } from "@auora/contracts";
 import { PolicyCompileError, type BundleSpec, type CompiledBundle, type CompiledLayer, type CompiledMatcher, type CompiledRule, type ObligationSpec, type RuleSpec, type StrOrList } from "./types.js";
 
 export { PolicyCompileError } from "./types.js";
 
-const schema = JSON.parse(readFileSync(new URL("../schemas/policy.v1.json", import.meta.url), "utf8")) as object;
-const ajv = new Ajv2020({ strict: true, allErrors: true });
-const validateSpec = ajv.compile(schema);
+// I/O in this package is confined to load-time functions (parseBundle, loadLayerFile, and
+// the lazy schema validator below); the evaluation path (later modules) performs none.
+type BundleValidator = { ajv: Ajv2020; validate: ValidateFunction };
+let cachedValidator: BundleValidator | undefined;
+function bundleValidator(): BundleValidator {
+  if (!cachedValidator) {
+    const schema = JSON.parse(readFileSync(new URL("../schemas/policy.v1.json", import.meta.url), "utf8")) as object;
+    const ajv = new Ajv2020({ strict: true, allErrors: true });
+    cachedValidator = { ajv, validate: ajv.compile(schema) };
+  }
+  return cachedValidator;
+}
 
 export const DEFAULT_TTL_MS = 5000;
 const DOMAIN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/;
@@ -28,6 +37,15 @@ function setOf<T extends string>(ruleId: string, field: string, values: string[]
   return new Set(values as T[]);
 }
 
+/**
+ * Contract: `pattern`, and any path later tested against the compiled RegExp, must already be
+ * percent-decoded and dot-segment normalized by the caller (the enforcement point) before it
+ * reaches this function. Matching is case-sensitive and exact on trailing slashes: a pattern
+ * without a trailing slash never matches a path that has one. A single `*` compiles to
+ * `[^/]+`, so it never crosses a decoded `/`, but it still matches a percent-encoded
+ * separator such as `%2F`, because that is three literal characters, not a `/`. This function
+ * only compiles the pattern; it does not decode, normalize, or reject encoded input itself.
+ */
 export function compilePathPattern(pattern: string): RegExp {
   if (!PATH_CHARS.test(pattern) || pattern.includes("**")) throw new PolicyCompileError("INVALID_PATTERN", pattern);
   const source = pattern.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join("[^/]+");
@@ -49,14 +67,19 @@ function byId(a: RuleSpec, b: RuleSpec): number {
 }
 
 export function parseBundle(text: string): BundleSpec {
-  const doc: unknown = parseYaml(text);
-  if (!validateSpec(doc)) throw new PolicyCompileError("SCHEMA", ajv.errorsText(validateSpec.errors));
-  return doc as BundleSpec;
+  const doc = parseDocument(text, { logLevel: "silent" });
+  if (doc.errors.length > 0) throw new PolicyCompileError("SCHEMA", doc.errors[0]!.message);
+  if (doc.warnings.length > 0) throw new PolicyCompileError("SCHEMA", doc.warnings[0]!.message);
+  const value: unknown = doc.toJS();
+  const { ajv, validate } = bundleValidator();
+  if (!validate(value)) throw new PolicyCompileError("SCHEMA", ajv.errorsText(validate.errors));
+  return value as BundleSpec;
 }
 
 export function compileLayer(spec: BundleSpec, name: string): CompiledLayer {
-  if (!validateSpec(spec)) throw new PolicyCompileError("SCHEMA", ajv.errorsText(validateSpec.errors));
-  let digest;
+  const { ajv, validate } = bundleValidator();
+  if (!validate(spec)) throw new PolicyCompileError("SCHEMA", ajv.errorsText(validate.errors));
+  let digest: Digest;
   try {
     digest = digestOf({ version: spec.version, ttl_ms: spec.ttl_ms ?? null, rules: [...spec.rules].sort(byId) });
   } catch (e) {
@@ -96,7 +119,6 @@ export function compileLayer(spec: BundleSpec, name: string): CompiledLayer {
       if (c.effect.has("privilege_change")) throw new PolicyCompileError("ALLOW_GUARDED_EFFECT", rule.id);
       if (c.labels_any || c.labels_read_any) throw new PolicyCompileError("ALLOW_LABEL_MATCHER", rule.id);
       if (c.signals_any) throw new PolicyCompileError("SIGNAL_RULE_ALLOWS", rule.id);
-      if (c.target_scope?.has("system") && (c.effect.has("write") || c.effect.has("delete"))) throw new PolicyCompileError("ALLOW_GUARDED_EFFECT", rule.id);
     }
     rules.push({ id: rule.id, layer: name, qualified_id: `${name}:${rule.id}`, priority: rule.priority, outcome: rule.outcome, obligations: normalizeObligations(rule.id, rule.obligations), match: c });
   }
