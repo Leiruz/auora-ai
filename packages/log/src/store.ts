@@ -89,12 +89,15 @@ export class EventStore {
 
   // The signature and binding checks are pure and run before the lock; the time-sensitive facts (expiry, signer still registered)
   // are checked again synchronously inside the write transaction, so nothing consumed can have gone stale while waiting.
+  // The pure predicate's nonce set is deliberately passed empty: the durable approvals table is the single authority on
+  // consumption, so a future reader should not thread a real set through here.
   async verifyAndConsumeApproval(record: unknown, ctx: LedgerContext): Promise<ApprovalVerdict> {
     const verdict = await verifyApproval(record, { ...ctx, now: ctx.clock(), seenNonces: new Set<string>() });
     if (!verdict.ok) return verdict;
     this.beginImmediate();
     try {
       const now = ctx.clock();
+      if (!Number.isFinite(Date.parse(now))) { this.db.exec("ROLLBACK"); return { ok: false, code: "SCHEMA_INVALID", detail: "unparseable timestamp" }; }
       if (Date.parse(now) > Date.parse(verdict.record.expires_at)) { this.db.exec("ROLLBACK"); return { ok: false, code: "EXPIRED" }; }
       if (!ctx.registry.has(verdict.record.signer_key_id)) { this.db.exec("ROLLBACK"); return { ok: false, code: "UNKNOWN_SIGNER" }; }
       const existing = this.db.prepare("SELECT nonce FROM approvals WHERE nonce = ?").get(verdict.record.nonce);

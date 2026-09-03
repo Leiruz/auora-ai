@@ -126,6 +126,22 @@ describe("event store", () => {
     const revoked = await a.verifyAndConsumeApproval(fresh, { ...ctx, registry: new Map() });
     expect(revoked).toEqual({ ok: false, code: "UNKNOWN_SIGNER" });
     expect((await a.verifyAndConsumeApproval(fresh, ctx)).ok).toBe(true);
+    // The rejection above never opens a transaction: an empty registry is caught by the pure predicate before the
+    // lock, so it cannot prove the in-transaction signer recheck itself does anything. Force that window open by
+    // revoking the key between the two clock reads: the first (pre-lock) still sees it, the second (post-lock) does not.
+    const revocationRecord = await signApproval({ ...unsigned, nonce: "p".repeat(22) }, device);
+    const revocable = new Map(registry);
+    let revocationTicks = 0;
+    const revokedUnderLock = await a.verifyAndConsumeApproval(revocationRecord, { ...ctx, registry: revocable, clock: () => { if (++revocationTicks === 2) revocable.delete(device.keyId); return "2026-09-02T10:01:00Z"; } });
+    expect(revokedUnderLock).toEqual({ ok: false, code: "UNKNOWN_SIGNER" });
+    // Proves the failed in-transaction recheck rolled back rather than consuming the nonce.
+    expect((await a.verifyAndConsumeApproval(revocationRecord, ctx)).ok).toBe(true);
+    // An unparseable second clock read must fail closed, not silently pass the expiry compare (NaN > x is false).
+    const unparseableClockRecord = await signApproval({ ...unsigned, nonce: "q".repeat(22) }, device);
+    let clockTicks = 0;
+    const unparseable = await a.verifyAndConsumeApproval(unparseableClockRecord, { ...ctx, clock: () => { clockTicks++; return clockTicks === 2 ? "not-a-date" : "2026-09-02T10:01:00Z"; } });
+    expect(unparseable).toEqual({ ok: false, code: "SCHEMA_INVALID", detail: "unparseable timestamp" });
+    expect((await a.verifyAndConsumeApproval(unparseableClockRecord, ctx)).ok).toBe(true);
     a.close(); b.close();
   });
 });
