@@ -83,13 +83,32 @@ describe("policy laws", () => {
       const after = rank(evaluate({ ...d, labels: [...new Set([...d.labels, ...labels])] }, b).outcome);
       expect(after).toBeGreaterThanOrEqual(before);
     }), { numRuns: 500 });
-    // Fourth check: adding a read label never moves a decision towards allow.
-    fc.assert(fc.property(arbDescriptor, arbBundle, el(["confidential", "secret"] as const), (d, spec, label) => {
-      const b = compiled(spec);
-      const before = rank(evaluate(d, b).outcome);
-      const after = rank(evaluate({ ...d, run_state: { ...d.run_state, labels_read: [...new Set([...d.run_state.labels_read, label])] } }, b).outcome);
-      expect(after).toBeGreaterThanOrEqual(before);
-    }), { numRuns: 500 });
+    // Fourth check: adding a read label never moves a decision towards allow. A generic random
+    // bundle rarely lands the one shape that actually exercises read-label gating (a
+    // labels_read_any rule wrongly entering the priority contest), so this is a targeted
+    // construction instead of a reuse of arbBundle. Rule "floor" matches every descriptor, at
+    // the maximum severity outcome and a low priority. Rule "gate" matches only via
+    // labels_read_any, at a higher priority and a strictly less severe outcome. A correctly
+    // gated rule may only raise the outcome the ungated rules already settled on; it must never
+    // win the priority contest and replace it. So adding the label "gate" keys on must leave the
+    // floor outcome in place.
+    fc.assert(fc.property(
+      arbDescriptor, fc.nat({ max: 49 }), fc.integer({ min: 51, max: 100 }), el(nonAllow.filter((o) => o !== "terminate")),
+      (d, floorPriority, gatePriority, gateOutcome) => {
+        const label = "confidential" as const;
+        const b = compiled({
+          version: 1,
+          rules: [
+            { id: "floor", priority: floorPriority, outcome: "terminate", match: { effect: [...EFFECT_CLASSES] } },
+            { id: "gate", priority: gatePriority, outcome: gateOutcome, match: { labels_read_any: [label] } },
+          ],
+        });
+        const readWithout = d.run_state.labels_read.filter((l) => l !== label);
+        const before = rank(evaluate({ ...d, run_state: { ...d.run_state, labels_read: readWithout } }, b).outcome);
+        const after = rank(evaluate({ ...d, run_state: { ...d.run_state, labels_read: [...readWithout, label] } }, b).outcome);
+        expect(after).toBeGreaterThanOrEqual(before);
+      },
+    ), { numRuns: 500 });
   });
   it("law 3: adding a behavior signal never moves a decision towards allow", () => {
     fc.assert(fc.property(arbDescriptor, arbBundle, el(SIGNAL_CODES), (d, spec, code) => {
