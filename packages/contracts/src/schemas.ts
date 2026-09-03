@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import type { ValidateFunction } from "ajv";
+import { assertSignable } from "./canonical.js";
 import type { ActionDescriptor, ApprovalRecord, CapabilityCall, CapabilityResult, Decision, EventEnvelope, EventType, HookEvent, HookResponse } from "./types.js";
 
 const BASE = "https://auora.dev/schemas/";
@@ -46,6 +47,7 @@ function compileRef<T>(ref: string): (input: unknown) => Validation<T> {
   return (input: unknown) => {
     const shape = shapeErrors(input);
     if (shape.length > 0) return { ok: false, errors: shape };
+    try { assertSignable(input); } catch (error) { return { ok: false, errors: [String(error)] }; }
     if (fn(input)) return { ok: true, value: input };
     return { ok: false, errors: (fn.errors ?? []).map((e) => `${e.instancePath || "$"} ${e.message ?? "invalid"}`) };
   };

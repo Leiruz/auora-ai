@@ -45,11 +45,25 @@ describe("contract validators", () => {
     expect(validateHookEvent(hookEvent({ deep })).ok).toBe(true);
     for (let i = 0; i < 13; i++) deep = [deep];
     expect(validateHookEvent(hookEvent({ deep })).ok).toBe(false);
-    fc.assert(fc.property(fc.dictionary(fc.stringMatching(/^[a-z]{1,6}$/), jsonValue, { maxKeys: 4 }), (input) => {
-      const v = validateHookEvent(hookEvent(input));
-      expect(v.ok).toBe(true);
-      expect(() => canonicalJson(hookEvent(input))).not.toThrow();
-    }));
+    const hostileValue = fc.oneof(
+      jsonValue,
+      fc.anything({ withDate: true, withBoxedValues: true, withMap: true, withSet: true, withTypedArray: true, withSparseArray: true, withNullPrototype: true, withUnicodeString: true }),
+    );
+    fc.assert(
+      fc.property(hostileValue, (input) => {
+        const v = validateHookEvent(hookEvent(input as JsonValue));
+        if (v.ok) expect(() => canonicalJson(hookEvent(input as JsonValue))).not.toThrow();
+      }),
+      { numRuns: 300 },
+    );
+    fc.assert(
+      fc.property(fc.dictionary(fc.stringMatching(/^[a-z]{1,6}$/), jsonValue, { maxKeys: 4 }), (input) => {
+        const v = validateHookEvent(hookEvent(input));
+        expect(v.ok).toBe(true);
+        expect(() => canonicalJson(hookEvent(input))).not.toThrow();
+      }),
+      { numRuns: 300 },
+    );
   });
   it("requires approval_request_id when the outcome is require_approval", () => {
     expect(validateDecision(sampleDecision({ outcome: "require_approval" })).ok).toBe(false);
