@@ -7,8 +7,8 @@ export const PROTECTED_PATH_PATTERNS: readonly RegExp[] = Object.freeze([
   /(^|[\\/])\.auora([\\/]|$)/i,
   /(^|[\\/])\.claude([\\/]|$)/i,
   /(^|[\\/])\.codex([\\/]|$)/i,
-  /(^|[\\/])\.(claude|mcp)\.json$/i,
-  /(^|[\\/])(\.bashrc|\.bash_profile|\.zshrc|\.zprofile|\.profile|Microsoft\.PowerShell_profile\.ps1)$/i,
+  /(^|[\\/])\.(claude|mcp)\.json[. ]*$/i,
+  /(^|[\\/])(\.bashrc|\.bash_profile|\.zshrc|\.zprofile|\.profile|\.zshenv|\.bash_login|\.zlogin|Microsoft\.PowerShell_profile\.ps1|profile\.ps1)[. ]*$/i,
   /^auora:\/\//i,
 ]);
 

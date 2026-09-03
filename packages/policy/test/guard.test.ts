@@ -41,15 +41,21 @@ describe("guard tier", () => {
   });
   it("protects shell and PowerShell profile startup files", () => {
     expect(isProtectedPath("home/z/.bashrc")).toBe(true);
+    expect(isProtectedPath("home/z/.bashrc.")).toBe(true);
+    expect(isProtectedPath("home/z/.zshenv")).toBe(true);
     expect(isProtectedPath("Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1")).toBe(true);
+    expect(isProtectedPath("Documents/PowerShell/profile.ps1")).toBe(true);
     expect(isProtectedPath("src/bashrc.md")).toBe(false);
   });
   it("protects the .claude directory and the top-level .claude.json and .mcp.json files", () => {
     expect(isProtectedPath(".claude/hooks/pre.sh")).toBe(true);
     expect(isProtectedPath(".claude/agents/x.md")).toBe(true);
     expect(isProtectedPath(".mcp.json")).toBe(true);
+    expect(isProtectedPath(".mcp.json.")).toBe(true);
+    expect(isProtectedPath(".mcp.json ")).toBe(true);
     expect(isProtectedPath(".claude.json")).toBe(true);
     expect(isProtectedPath(".claude.json.bak")).toBe(false);
+    expect(isProtectedPath("myapp.profile")).toBe(false);
     expect(isProtectedPath("foo.claude/x")).toBe(false);
   });
   it("extends guard 1 to targets scoped external, without widening it for internal labels", () => {
