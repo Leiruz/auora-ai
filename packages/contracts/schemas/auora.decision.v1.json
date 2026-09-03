@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auora.dev/schemas/auora.decision.v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "decision_id", "action_id", "run_id", "outcome", "tier", "reason_codes", "matched_rule_ids", "policy_digest", "obligations", "ttl_ms"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "auora.decision/1" },
+    "decision_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/dec_id" },
+    "action_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/act_id" },
+    "run_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/run_id" },
+    "outcome": { "type": "string", "enum": ["allow", "throttle", "require_approval", "deny", "terminate"] },
+    "tier": { "type": "string", "enum": ["guard", "policy"] },
+    "reason_codes": { "type": "array", "maxItems": 64, "items": { "type": "string", "pattern": "^[A-Z0-9_]{3,64}$" } },
+    "matched_rule_ids": { "type": "array", "maxItems": 256, "items": { "type": "string", "minLength": 1, "maxLength": 160 } },
+    "policy_digest": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/digest" },
+    "obligations": { "type": "array", "maxItems": 4, "items": { "$ref": "#/$defs/obligation" } },
+    "approval_request_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/apr_id" },
+    "ttl_ms": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" }
+  },
+  "if": { "type": "object", "properties": { "outcome": { "type": "string", "const": "require_approval" } } },
+  "then": { "required": ["approval_request_id"] },
+  "$defs": {
+    "obligation": { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "type": "string", "enum": ["redact_fields", "max_response_bytes", "record_payload_digest", "notify"] }, "fields": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 128 } }, "max_bytes": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }, "channel": { "type": "string", "minLength": 1, "maxLength": 64 } } }
+  }
+}

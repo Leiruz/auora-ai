@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auora.dev/schemas/auora.event.v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "run_id", "seq", "type", "occurred_at", "coverage", "prev_hash", "payload", "event_hash", "key_id", "signature"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "auora.event/1" },
+    "event_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/evt_id" },
+    "run_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/run_id" },
+    "seq": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" },
+    "type": { "type": "string", "enum": ["run.started", "action.requested", "policy.decided", "approval.requested", "approval.resolved", "approval.expired", "effect.observed", "coverage.changed", "run.terminated", "run.ended"] },
+    "occurred_at": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/timestamp" },
+    "coverage": { "type": "string", "enum": ["protected", "observed", "unprotected"] },
+    "prev_hash": { "anyOf": [{ "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/digest" }, { "type": "string", "const": "GENESIS" }] },
+    "payload": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/json_object" },
+    "event_hash": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/digest" },
+    "key_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/key_id" },
+    "signature": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/signature" }
+  },
+  "$defs": {
+    "payload_run_started": { "type": "object", "additionalProperties": false, "required": ["profile_digest", "agent"], "properties": { "profile_digest": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/digest" }, "agent": { "type": "object", "additionalProperties": false, "required": ["kind", "version"], "properties": { "kind": { "type": "string", "enum": ["claude-code", "codex", "generic"] }, "version": { "type": "string", "maxLength": 64 } } } } },
+    "payload_action_requested": { "type": "object", "additionalProperties": false, "required": ["descriptor"], "properties": { "descriptor": { "$ref": "https://auora.dev/schemas/auora.action.v1.json" } } },
+    "payload_policy_decided": { "type": "object", "additionalProperties": false, "required": ["decision"], "properties": { "decision": { "$ref": "https://auora.dev/schemas/auora.decision.v1.json" } } },
+    "payload_approval_requested": { "type": "object", "additionalProperties": false, "required": ["approval_request_id", "action_id", "descriptor_digest", "expires_at"], "properties": { "approval_request_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/apr_id" }, "action_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/act_id" }, "descriptor_digest": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/digest" }, "expires_at": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/timestamp" } } },
+    "payload_approval_resolved": { "type": "object", "additionalProperties": false, "required": ["approval_request_id", "resolution", "surface", "signer_key_id"], "properties": { "approval_request_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/apr_id" }, "resolution": { "type": "string", "enum": ["approved", "denied"] }, "surface": { "type": "string", "enum": ["desktop", "device"] }, "signer_key_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/key_id" } } },
+    "payload_approval_expired": { "type": "object", "additionalProperties": false, "required": ["approval_request_id"], "properties": { "approval_request_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/apr_id" } } },
+    "payload_effect_observed": { "type": "object", "additionalProperties": false, "required": ["action_id", "status"], "properties": { "action_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/act_id" }, "status": { "type": "string", "enum": ["ok", "error", "timeout", "out_of_memory", "process_limit"] }, "size_bytes": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" }, "code": { "type": "string", "pattern": "^[A-Z0-9_]{3,64}$" }, "command_text_ciphertext": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$", "maxLength": 262144 } } },
+    "payload_coverage_changed": { "type": "object", "additionalProperties": false, "required": ["from", "to", "reason"], "properties": { "from": { "type": "string", "enum": ["protected", "observed", "unprotected"] }, "to": { "type": "string", "enum": ["protected", "observed", "unprotected"] }, "reason": { "type": "string", "pattern": "^[A-Z0-9_]{3,64}$" } } },
+    "payload_run_terminated": { "type": "object", "additionalProperties": false, "required": ["reason"], "properties": { "reason": { "type": "string", "pattern": "^[A-Z0-9_]{3,64}$" } } },
+    "payload_run_ended": { "type": "object", "additionalProperties": false, "required": ["counters"], "properties": { "counters": { "type": "object", "additionalProperties": false, "required": ["actions", "sends", "denials", "approvals", "retries"], "properties": { "actions": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" }, "sends": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" }, "denials": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" }, "approvals": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" }, "retries": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" } } } } }
+  }
+}

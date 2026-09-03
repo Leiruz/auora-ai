@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auora.dev/schemas/auora.approval.v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "approval_id", "action_id", "descriptor_digest", "run_id", "policy_digest", "surface", "signer_key_id", "issued_at", "expires_at", "nonce", "signature"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "auora.approval/1" },
+    "approval_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/apr_id" },
+    "action_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/act_id" },
+    "descriptor_digest": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/digest" },
+    "run_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/run_id" },
+    "policy_digest": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/digest" },
+    "surface": { "type": "string", "enum": ["desktop", "device"] },
+    "signer_key_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/key_id" },
+    "issued_at": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/timestamp" },
+    "expires_at": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/timestamp" },
+    "nonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{22,64}$" },
+    "signature": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/signature" }
+  }
+}

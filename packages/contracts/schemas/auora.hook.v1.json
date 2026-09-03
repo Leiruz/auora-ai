@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auora.dev/schemas/auora.hook.v1.json",
+  "oneOf": [{ "$ref": "#/$defs/event" }, { "$ref": "#/$defs/response" }],
+  "$defs": {
+    "event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "kind", "agent", "event", "session_id", "cwd", "raw_digest"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "auora.hook/1" }, "kind": { "type": "string", "const": "event" },
+        "agent": { "type": "string", "enum": ["claude-code", "codex", "generic"] },
+        "event": { "type": "string", "enum": ["pre_tool", "post_tool", "permission_request", "session_start", "session_end"] },
+        "session_id": { "type": "string", "minLength": 1, "maxLength": 128 }, "cwd": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "tool_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "tool_input": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/json_object" },
+        "tool_use_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "raw_digest": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/digest" }
+      }
+    },
+    "response": {
+      "type": "object", "additionalProperties": false, "required": ["schema_version", "kind", "decision", "reason"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "auora.hook/1" }, "kind": { "type": "string", "const": "response" },
+        "decision": { "type": "string", "enum": ["allow", "deny", "ask"] }, "reason": { "type": "string", "maxLength": 512 },
+        "action_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/act_id" }
+      }
+    }
+  }
+}
