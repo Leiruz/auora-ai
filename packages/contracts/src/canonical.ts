@@ -1,4 +1,5 @@
 // packages/contracts/src/canonical.ts
+/// <reference lib="es2024.string" />
 import { createHash } from "node:crypto";
 import canonicalize from "canonicalize";
 
@@ -29,16 +30,21 @@ function check(value: unknown, path: string): void {
       if (!Number.isSafeInteger(value)) throw new CanonicalError("UNSAFE_INTEGER", path);
       return;
     case "string":
+      if (!value.isWellFormed()) throw new CanonicalError("UNSUPPORTED_VALUE", path);
       if (value.normalize("NFC") !== value) throw new CanonicalError("NON_NFC_STRING", path);
       return;
     case "object": {
       if (Array.isArray(value)) {
-        value.forEach((v, i) => check(v, `${path}[${i}]`));
+        for (let i = 0; i < value.length; i++) {
+          if (!(i in value)) throw new CanonicalError("UNSUPPORTED_VALUE", `${path}[${i}]`);
+          check(value[i], `${path}[${i}]`);
+        }
         return;
       }
       if (!isPlainObject(value)) throw new CanonicalError("UNSUPPORTED_VALUE", path);
       for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
         if (v === undefined) throw new CanonicalError("UNSUPPORTED_VALUE", `${path}.${key}`);
+        if (!key.isWellFormed()) throw new CanonicalError("UNSUPPORTED_VALUE", `${path}.${key}`);
         if (key.normalize("NFC") !== key) throw new CanonicalError("NON_NFC_STRING", `${path}.${key}`);
         check(v, `${path}.${key}`);
       }

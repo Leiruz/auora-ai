@@ -30,6 +30,10 @@ describe("canonical bytes", () => {
     expect(() => canonicalJson({ d: new Date(0) })).toThrowError(/UNSUPPORTED_VALUE/);
     expect(() => canonicalJson({ m: new Map() })).toThrowError(/UNSUPPORTED_VALUE/);
     expect(() => canonicalJson(Object.create({ inherited: 1 }))).toThrowError(/UNSUPPORTED_VALUE/);
+    expect(() => assertSignable([1, , 3])).toThrowError(/UNSUPPORTED_VALUE/);
+    expect(() => assertSignable(new Array(2))).toThrowError(/UNSUPPORTED_VALUE/);
+    expect(() => assertSignable({ s: "\ud800" })).toThrowError(/UNSUPPORTED_VALUE/);
+    expect(() => assertSignable({ "\ud800": 1 })).toThrowError(/UNSUPPORTED_VALUE/);
   });
   it("digests without the named keys", () => {
     const obj = { a: 1, b: 2, signature: "x" };
