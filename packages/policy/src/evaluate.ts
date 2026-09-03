@@ -70,7 +70,7 @@ export function mergeObligations(rules: readonly CompiledRule[]): Obligation[] {
 // and signals (law in spec 5.3). Consequently, a gated rule cannot be overridden by any ungated rule at any priority;
 // two gated rules with different outcomes never produce POLICY_CONFLICT, as the higher rank simply wins; and adding
 // labels or signals to a descriptor never moves the decision towards allow.
-function isGated(m: CompiledMatcher): boolean {
+export function isGated(m: CompiledMatcher): boolean {
   return m.labels_any !== undefined || m.labels_read_any !== undefined || m.signals_any !== undefined;
 }
 
