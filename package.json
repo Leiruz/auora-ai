@@ -1,0 +1,21 @@
+{
+  "name": "auora-ai",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "lint:dashes": "node scripts/check-no-dashes.mjs",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "vitest run",
+    "verify": "pnpm lint:dashes && pnpm typecheck && pnpm test",
+    "mutation-check": "node scripts/mutation-check.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "fast-check": "^4.9.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}
