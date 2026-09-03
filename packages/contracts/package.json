@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "canonicalize": "^4.0.0",
     "ulid": "^3.0.2"
   }
 }

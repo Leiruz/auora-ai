@@ -1,0 +1,7 @@
+[
+  { "name": "sorted keys", "input": { "b": 1, "a": [3, 2, { "z": null, "y": true }] }, "canonical": "{\"a\":[3,2,{\"y\":true,\"z\":null}],\"b\":1}", "digest": "sha256:33bef542086bfa877f726360f91097533ce98bb9c4a54e5051b8fd1940d9456d" },
+  { "name": "string escaping per RFC 8785", "input": { "string": "€$\u000f\nA'B\"\\/" }, "canonical": "{\"string\":\"€$\\u000f\\nA'B\\\"\\\\/\"}" },
+  { "name": "key order by utf16 code units", "input": { "é": 1, "z": 2, "a": 3 }, "canonical": "{\"a\":3,\"z\":2,\"é\":1}" },
+  { "name": "empty containers", "input": { "arr": [], "obj": {} }, "canonical": "{\"arr\":[],\"obj\":{}}" },
+  { "name": "max safe integer", "input": { "n": 9007199254740991 }, "canonical": "{\"n\":9007199254740991}" }
+]
