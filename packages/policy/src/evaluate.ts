@@ -65,6 +65,11 @@ export function mergeObligations(rules: readonly CompiledRule[]): Obligation[] {
   return OBLIGATION_TYPES.filter((t) => byType.has(t)).map((t) => mergedObligation(t, byType.get(t)!));
 }
 
+// Gated rules (those with labels_any, labels_read_any, or signals_any matchers) are excluded from the priority
+// contest and can only raise the outcome computed from ungated rules. This makes evaluation monotone under labels
+// and signals (law in spec 5.3). Consequently, a gated rule cannot be overridden by any ungated rule at any priority;
+// two gated rules with different outcomes never produce POLICY_CONFLICT, as the higher rank simply wins; and adding
+// labels or signals to a descriptor never moves the decision towards allow.
 function isGated(m: CompiledMatcher): boolean {
   return m.labels_any !== undefined || m.labels_read_any !== undefined || m.signals_any !== undefined;
 }

@@ -45,11 +45,12 @@ const arbAllowRule: fc.Arbitrary<RuleSpec> = fc.record({ priority: fc.nat({ max:
 
 const arbRestrictiveRule: fc.Arbitrary<RuleSpec> = fc.record({
   priority: fc.nat({ max: 100 }), outcome: el(nonAllow), effect: fc.option(subset(EFFECT_CLASSES, 1), { nil: undefined }), common: arbCommonMatch,
-  labels_any: fc.option(subset(LABELS, 1), { nil: undefined }), signals_any: fc.option(subset(SIGNAL_CODES, 1), { nil: undefined }),
+  labels_any: fc.option(subset(LABELS, 1), { nil: undefined }), labels_read_any: fc.option(subset(LABELS, 1), { nil: undefined }), signals_any: fc.option(subset(SIGNAL_CODES, 1), { nil: undefined }),
 }).map((r) => {
   const match: Record<string, unknown> = { ...r.common };
   if (r.effect) match["effect"] = r.effect;
   if (r.labels_any) match["labels_any"] = r.labels_any;
+  if (r.labels_read_any) match["labels_read_any"] = r.labels_read_any;
   if (r.signals_any) match["signals_any"] = r.signals_any;
   if (Object.keys(match).length === 0) match["effect"] = [...EFFECT_CLASSES];
   return { id: "x", priority: r.priority, outcome: r.outcome, match: match as RuleSpec["match"] };
@@ -80,6 +81,13 @@ describe("policy laws", () => {
       const b = compiled(spec);
       const before = rank(evaluate(d, b).outcome);
       const after = rank(evaluate({ ...d, labels: [...new Set([...d.labels, ...labels])] }, b).outcome);
+      expect(after).toBeGreaterThanOrEqual(before);
+    }), { numRuns: 500 });
+    // Fourth check: adding a read label never moves a decision towards allow.
+    fc.assert(fc.property(arbDescriptor, arbBundle, el(["confidential", "secret"] as const), (d, spec, label) => {
+      const b = compiled(spec);
+      const before = rank(evaluate(d, b).outcome);
+      const after = rank(evaluate({ ...d, run_state: { ...d.run_state, labels_read: [...new Set([...d.run_state.labels_read, label])] } }, b).outcome);
       expect(after).toBeGreaterThanOrEqual(before);
     }), { numRuns: 500 });
   });
