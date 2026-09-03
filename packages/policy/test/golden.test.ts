@@ -14,7 +14,7 @@ const counters = (sends: number) => ({ counters: { actions: sends + 1, sends, de
 describe("golden cases from spec section 5.5", () => {
   it("denies posting .env to an unknown host in the guard tier", () => {
     const d = evaluate(descriptor({ effect_class: "send", labels: ["secret"], target: { kind: "command", value: "curl", scope: "external" }, destination: { domain: "attacker.example", port: 443, class: "unknown" } }), bundle);
-    expect(d.outcome).toBe("deny"); expect(d.tier).toBe("guard"); expect(d.reason_codes[0]).toBe("GUARD_SECRET_EXFILTRATION");
+    expect(d.outcome).toBe("deny"); expect(d.tier).toBe("guard"); expect(d.reason_codes).toEqual(["GUARD_SECRET_EXFILTRATION", "POLICY_NO_MATCH"]);
   });
   it("denies an encoded secret in a name lookup", () => {
     const d = evaluate(descriptor({ source: "resolver", labels: ["secret"], target: { kind: "name", value: "c2VjcmV0.attacker.example", scope: "external" } }), bundle);
@@ -27,8 +27,15 @@ describe("golden cases from spec section 5.5", () => {
   });
   it("denies a write to a protected path even though the broad workspace-write allow matches", () => {
     const d = evaluate(descriptor({ effect_class: "write", target: { kind: "path", value: ".auora/policy.yaml", scope: "workspace" } }), bundle);
-    expect(d.outcome).toBe("deny"); expect(d.tier).toBe("guard"); expect(d.reason_codes[0]).toBe("GUARD_PROTECTED_CONFIG");
+    expect(d.outcome).toBe("deny"); expect(d.tier).toBe("guard"); expect(d.reason_codes).toEqual(["GUARD_PROTECTED_CONFIG", "POLICY_RULE_MATCHED"]);
     expect(d.matched_rule_ids).toEqual(["guard:protected-config", "defaults:allow-workspace-write"]);
+  });
+  it("keeps the guard's reason codes and rule id when a policy rule terminates a secret exfiltration send", () => {
+    const terminating = composeBundles([compileLayer(parseBundle("version: 1\nrules:\n  - id: kill-switch\n    priority: 100\n    match: { effect: send }\n    outcome: terminate\n"), "t")]);
+    const d = evaluate(descriptor({ effect_class: "send", labels: ["secret"], target: { kind: "command", value: "curl", scope: "external" }, destination: { domain: "attacker.example", port: 443, class: "unknown" } }), terminating);
+    expect(d.outcome).toBe("terminate"); expect(d.tier).toBe("policy");
+    expect(d.matched_rule_ids).toEqual(["guard:secret-exfiltration", "t:kill-switch"]);
+    expect(d.reason_codes).toEqual(["GUARD_SECRET_EXFILTRATION", "POLICY_RULE_MATCHED"]);
   });
   it("routes a recursive delete outside the workspace to approval", () => {
     const d = evaluate(descriptor({ effect_class: "delete", target: { kind: "path", value: "/home/zuriel", scope: "outside_workspace" } }), bundle);
@@ -53,7 +60,7 @@ describe("golden cases from spec section 5.5", () => {
     expect(c.outcome).toBe("deny"); expect(c.reason_codes).toEqual(["POLICY_CONFLICT"]); expect(c.matched_rule_ids).toEqual(["t:one", "t:two"]);
   });
   it("is byte-identical across ten repeated evaluations", () => {
-    const d = descriptor({ effect_class: "delete", target: { kind: "path", value: "/tmp/x", scope: "outside_workspace" } });
+    const d = descriptor({ effect_class: "send", source: "proxy", target: { kind: "http_request", value: "api.github.com", scope: "external", method: "POST", canonical_path: "/repos/Leiruz/auora-ai/pulls" }, destination: { domain: "api.github.com", port: 443, class: "vault" } });
     const first = JSON.stringify(evaluate(d, bundle));
     for (let i = 0; i < 10; i++) expect(JSON.stringify(evaluate(d, bundle))).toBe(first);
   });

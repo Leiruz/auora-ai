@@ -1,7 +1,7 @@
 // packages/policy/test/properties.test.ts
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { AGENT_KINDS, DESTINATION_CLASSES, EFFECT_CLASSES, LABELS, OUTCOMES, OUTCOME_RANK, RISK_CLASSES, SIGNAL_CODES, SOURCES, TARGET_KINDS, TARGET_SCOPES, type ActionDescriptor, type EffectClass, type Outcome } from "@auora/contracts";
+import { AGENT_KINDS, DESTINATION_CLASSES, EFFECT_CLASSES, LABELS, OUTCOMES, OUTCOME_RANK, RISK_CLASSES, SIGNAL_CODES, SOURCES, TARGET_KINDS, TARGET_SCOPES, type ActionDescriptor, type EffectClass, type Obligation, type Outcome } from "@auora/contracts";
 import { compileLayer, composeBundles, PolicyCompileError, type BundleSpec, type RuleSpec } from "../src/index.js";
 import { evaluate } from "../src/evaluate.js";
 import { guardTier } from "../src/guard.js";
@@ -33,8 +33,15 @@ const arbCommonMatch = fc.record({
   counters: fc.option(fc.record({ sends_gte: fc.nat({ max: 4 }) }), { nil: undefined }),
 }).map((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined)) as Record<string, unknown>);
 
-const arbAllowRule: fc.Arbitrary<RuleSpec> = fc.record({ priority: fc.nat({ max: 100 }), effect: subset(allowableEffects, 1), common: arbCommonMatch })
-  .map((r) => ({ id: "x", priority: r.priority, outcome: "allow" as const, match: { ...r.common, effect: r.effect } as RuleSpec["match"] }));
+const arbObligation: fc.Arbitrary<Obligation> = fc.oneof(
+  fc.record({ type: fc.constant("redact_fields" as const), fields: fc.uniqueArray(fc.constantFrom("a", "b", "c"), { minLength: 1, maxLength: 3 }) }),
+  fc.record({ type: fc.constant("max_response_bytes" as const), max_bytes: fc.integer({ min: 1, max: 65536 }) }),
+  fc.record({ type: fc.constant("record_payload_digest" as const) }),
+  fc.record({ type: fc.constant("notify" as const), channel: fc.constantFrom("email", "slack") }),
+);
+
+const arbAllowRule: fc.Arbitrary<RuleSpec> = fc.record({ priority: fc.nat({ max: 100 }), effect: subset(allowableEffects, 1), common: arbCommonMatch, obligations: fc.array(arbObligation, { maxLength: 4 }) })
+  .map((r) => ({ id: "x", priority: r.priority, outcome: "allow" as const, match: { ...r.common, effect: r.effect } as RuleSpec["match"], obligations: r.obligations }));
 
 const arbRestrictiveRule: fc.Arbitrary<RuleSpec> = fc.record({
   priority: fc.nat({ max: 100 }), outcome: el(nonAllow), effect: fc.option(subset(EFFECT_CLASSES, 1), { nil: undefined }), common: arbCommonMatch,

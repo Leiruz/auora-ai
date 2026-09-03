@@ -1,5 +1,5 @@
 // packages/policy/src/evaluate.ts
-import { OBLIGATION_TYPES, OUTCOME_RANK, type ActionDescriptor, type Digest, type Obligation, type Outcome } from "@auora/contracts";
+import { OBLIGATION_TYPES, OUTCOME_RANK, type ActionDescriptor, type Digest, type Obligation, type ObligationType, type Outcome } from "@auora/contracts";
 import { guardTier } from "./guard.js";
 import type { CompiledBundle, CompiledMatcher, CompiledRule, CounterThresholds } from "./types.js";
 
@@ -39,36 +39,65 @@ export function matches(m: CompiledMatcher, d: ActionDescriptor): boolean {
   return true;
 }
 
+function mergedObligation(type: ObligationType, group: readonly Obligation[]): Obligation {
+  switch (type) {
+    case "redact_fields":
+      return { type, fields: [...new Set(group.flatMap((o) => o.fields ?? []))].sort() };
+    case "max_response_bytes": {
+      const bytes = group.map((o) => o.max_bytes).filter((b): b is number => b !== undefined);
+      return bytes.length > 0 ? { type, max_bytes: Math.min(...bytes) } : { type };
+    }
+    case "notify": {
+      const channels = group.map((o) => o.channel).filter((c): c is string => c !== undefined).sort();
+      return channels.length > 0 ? { type, channel: channels[0]! } : { type };
+    }
+    case "record_payload_digest":
+      return { type };
+  }
+}
+
 export function mergeObligations(rules: readonly CompiledRule[]): Obligation[] {
-  const byType = new Map<string, Obligation>();
-  for (const rule of rules) for (const o of rule.obligations) if (!byType.has(o.type)) byType.set(o.type, o);
-  return OBLIGATION_TYPES.filter((t) => byType.has(t)).map((t) => byType.get(t)!);
+  const byType = new Map<ObligationType, Obligation[]>();
+  for (const rule of rules) for (const o of rule.obligations) {
+    const group = byType.get(o.type);
+    if (group) group.push(o); else byType.set(o.type, [o]);
+  }
+  return OBLIGATION_TYPES.filter((t) => byType.has(t)).map((t) => mergedObligation(t, byType.get(t)!));
+}
+
+interface PolicyTierResult { outcome: Outcome; reasons: string[]; top: CompiledRule[] }
+
+function policyTier(d: ActionDescriptor, rules: readonly CompiledRule[]): PolicyTierResult {
+  const matched = rules.filter((rule) => matches(rule.match, d));
+  if (matched.length === 0) return { outcome: "deny", reasons: ["POLICY_NO_MATCH"], top: [] };
+  const max = Math.max(...matched.map((r) => r.priority));
+  const top = matched.filter((r) => r.priority === max);
+  const outcomes = new Set(top.map((r) => r.outcome));
+  const reasons: string[] = [];
+  let outcome: Outcome;
+  if (outcomes.size > 1) { outcome = "deny"; reasons.push("POLICY_CONFLICT"); }
+  else { outcome = top[0]!.outcome; reasons.push("POLICY_RULE_MATCHED"); }
+  return { outcome, reasons, top };
 }
 
 export function evaluate(d: ActionDescriptor, bundle: CompiledBundle): DecisionDraft {
   const guard = guardTier(d);
-  const matched = bundle.rules.filter((rule) => matches(rule.match, d));
-  let outcome: Outcome;
-  const reasons: string[] = [];
-  let top: CompiledRule[] = [];
-  if (matched.length === 0) {
-    outcome = "deny";
-    reasons.push("POLICY_NO_MATCH");
-  } else {
-    const max = Math.max(...matched.map((r) => r.priority));
-    top = matched.filter((r) => r.priority === max);
-    const outcomes = new Set(top.map((r) => r.outcome));
-    if (outcomes.size > 1) { outcome = "deny"; reasons.push("POLICY_CONFLICT"); }
-    else { outcome = top[0]!.outcome; reasons.push("POLICY_RULE_MATCHED"); }
-  }
-  let ids = top.map((r) => r.qualified_id).sort();
+  const neutral: ActionDescriptor = { ...d, labels: [], run_state: { ...d.run_state, labels_read: [], signals: [] } };
+  const baseline = policyTier(neutral, bundle.rules);
+  const asGiven = policyTier(d, bundle.rules);
+  const policy = OUTCOME_RANK[asGiven.outcome] >= OUTCOME_RANK[baseline.outcome] ? asGiven : baseline;
+  let outcome = policy.outcome;
+  const reasons = policy.reasons;
+  let ids = policy.top.map((r) => r.qualified_id).sort();
   let tier: "guard" | "policy" = "policy";
-  if (guard && OUTCOME_RANK[guard.outcome] >= OUTCOME_RANK[outcome]) {
-    outcome = guard.outcome;
-    tier = "guard";
+  if (guard) {
     reasons.unshift(...guard.reason_codes);
     ids = [...guard.rule_ids, ...ids];
+    if (OUTCOME_RANK[guard.outcome] >= OUTCOME_RANK[outcome]) {
+      outcome = guard.outcome;
+      tier = "guard";
+    }
   }
-  const obligations = outcome === "allow" ? mergeObligations(top) : [];
+  const obligations = outcome === "allow" ? mergeObligations(policy.top) : [];
   return { outcome, tier, reason_codes: reasons, matched_rule_ids: ids, obligations, policy_digest: bundle.digest, ttl_ms: bundle.ttl_ms };
 }
