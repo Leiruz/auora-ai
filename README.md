@@ -19,3 +19,10 @@ Apache-2.0. See [LICENSE](LICENSE).
 ## How this was made
 
 The design was produced by the founder in a structured dialogue with Claude (Anthropic) and adversarially reviewed by OpenAI Codex; the review log with every finding and its resolution is in the specification. Every product decision is the founder's. Code in this repository will be written with AI assistance and reviewed the same way, with the human merging.
+
+## Development
+
+- `pnpm verify` runs the dash check, typecheck and every test.
+- `pnpm mutation-check` disables each security guard in turn and proves its test fails.
+- `pnpm vitest run packages/<name>` runs one package's tests.
+- Node 24 or newer and pnpm 10 are required.
