@@ -1,22 +1,28 @@
 // packages/contracts/src/schemas.ts
-import { readFileSync } from "node:fs";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import type { ValidateFunction } from "ajv";
 import { assertSignable } from "./canonical.js";
 import type { ActionDescriptor, ApprovalRecord, CapabilityCall, CapabilityResult, Decision, EventEnvelope, EventType, HookEvent, HookResponse } from "./types.js";
+// Static JSON imports (not readFileSync) so this module performs no I/O: the schemas are bundled at
+// build time, not read from disk at runtime, so a Worker can import the pure policy surface (which
+// carries these transitively via @auora/contracts) without pulling node:fs into its bundle.
+import actionSchema from "../schemas/auora.action.v1.json" with { type: "json" };
+import decisionSchema from "../schemas/auora.decision.v1.json" with { type: "json" };
+import hookSchema from "../schemas/auora.hook.v1.json" with { type: "json" };
+import capabilitySchema from "../schemas/auora.capability.v1.json" with { type: "json" };
+import eventSchema from "../schemas/auora.event.v1.json" with { type: "json" };
+import approvalSchema from "../schemas/auora.approval.v1.json" with { type: "json" };
 
 const BASE = "https://auora.dev/schemas/";
-const FILES = ["auora.action.v1.json", "auora.decision.v1.json", "auora.hook.v1.json", "auora.capability.v1.json", "auora.event.v1.json", "auora.approval.v1.json"];
+const SCHEMAS = [actionSchema, decisionSchema, hookSchema, capabilitySchema, eventSchema, approvalSchema];
 
 // strictRequired: false because auora.decision.v1.json's "then" requires "approval_request_id",
 // a property declared in the schema's top-level "properties" rather than restated inside "then";
 // that is valid 2020-12 (if/then apply to the same instance) but Ajv's strict linter flags it.
 const ajv = new Ajv2020({ strict: true, allErrors: true, strictRequired: false });
 addFormats(ajv);
-for (const file of FILES) {
-  ajv.addSchema(JSON.parse(readFileSync(new URL(`../schemas/${file}`, import.meta.url), "utf8")) as object);
-}
+for (const schema of SCHEMAS) ajv.addSchema(schema as object);
 
 export type Validation<T> = { ok: true; value: T } | { ok: false; errors: string[] };
 

@@ -9,7 +9,14 @@ export const PROTECTED_PATH_PATTERNS: readonly RegExp[] = Object.freeze([
   /(^|[\\/])\.codex([\\/]|$)/i,
   /(^|[\\/])\.(claude|mcp)\.json[. ]*$/i,
   /(^|[\\/])(\.bashrc|\.bash_profile|\.zshrc|\.zprofile|\.profile|\.zshenv|\.bash_login|\.zlogin|Microsoft\.PowerShell_profile\.ps1|profile\.ps1)[. ]*$/i,
-  /(^|[\\/])etc[\\/](resolv\.conf|hosts|nsswitch\.conf)[. ]*$/i,
+  // Anchored to an absolute path (an optional drive letter, an optional macOS "private/" prefix,
+  // then a leading separator) so a relative "etc/" directory inside an ordinary project tree, such as
+  // myproject/etc/hosts or docker/etc/nsswitch.conf, is not caught by an immutable tier no bundle can open.
+  /^(?:[A-Za-z]:)?[\\/](?:private[\\/])?etc[\\/](resolv\.conf|hosts|nsswitch\.conf)[. ]*$/i,
+  // /etc/resolv.conf is commonly a symlink to the systemd-resolved stub resolver on Linux hosts, and
+  // this function's own precondition is a real-path-resolved input, so the resolved target needs its
+  // own pattern.
+  /(^|[\\/])run[\\/]systemd[\\/]resolve[\\/](resolv\.conf|stub-resolv\.conf)[. ]*$/i,
   /(^|[\\/])etc[\\/]systemd[\\/]resolved\.conf[. ]*$/i,
   /(^|[\\/])system32[\\/]drivers[\\/]etc[\\/](hosts|networks)[. ]*$/i,
   /^auora:\/\//i,

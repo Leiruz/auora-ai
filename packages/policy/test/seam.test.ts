@@ -2,9 +2,9 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { validateAction, validateDecision, type ActionDescriptor } from "@auora/contracts";
-import { composeBundles } from "../src/compile.js";
-import { MissingApprovalRequestIdError, promoteDecision } from "../src/decision.js";
-import { evaluate } from "../src/evaluate.js";
+// Through the "./pure" subpath, not a relative import, so this test also exercises that the exports
+// map actually resolves it (a typo there would otherwise go unnoticed, since nothing else imports it).
+import { composeBundles, evaluate, MissingApprovalRequestIdError, promoteDecision } from "@auora/policy/pure";
 import { loadLayerFile } from "../src/load.js";
 import { descriptor } from "./helpers.js";
 
@@ -44,9 +44,16 @@ describe("policy/contracts seam", () => {
     });
   });
 
-  it("throws MissingApprovalRequestIdError when a require_approval draft is promoted without an approval request id", () => {
+  it("throws MissingApprovalRequestIdError, carrying a code like the branch's other error types, when a require_approval draft is promoted without an approval request id", () => {
     const draft = evaluate(GOLDEN_APPROVAL, bundle);
     expect(draft.outcome).toBe("require_approval");
-    expect(() => promoteDecision(draft, { decision_id: "dec_01ARZ3NDEKTSV4RRFFQ69G5FAX", action_id: GOLDEN_APPROVAL.action_id, run_id: GOLDEN_APPROVAL.run_id })).toThrow(MissingApprovalRequestIdError);
+    let thrown: unknown;
+    try {
+      promoteDecision(draft, { decision_id: "dec_01ARZ3NDEKTSV4RRFFQ69G5FAX", action_id: GOLDEN_APPROVAL.action_id, run_id: GOLDEN_APPROVAL.run_id });
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(MissingApprovalRequestIdError);
+    expect((thrown as MissingApprovalRequestIdError).code).toBe("MISSING_APPROVAL_REQUEST_ID");
   });
 });

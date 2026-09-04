@@ -2,7 +2,7 @@
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import { parseDocument } from "yaml";
 import { AGENT_KINDS, CanonicalError, DESTINATION_CLASSES, EFFECT_CLASSES, HTTP_METHODS, LABELS, OBLIGATION_TYPES, RISK_CLASSES, SIGNAL_CODES, SOURCES, TARGET_KINDS, TARGET_SCOPES, digestOf, type Digest, type Obligation } from "@auora/contracts";
-import policySchema from "../schemas/policy.v1.json";
+import policySchema from "../schemas/policy.v1.json" with { type: "json" };
 import { PolicyCompileError, type BundleSpec, type CompiledBundle, type CompiledLayer, type CompiledMatcher, type CompiledRule, type ObligationSpec, type RuleSpec, type StrOrList } from "./types.js";
 
 export { PolicyCompileError } from "./types.js";

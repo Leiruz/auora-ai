@@ -34,6 +34,14 @@ describe("explain and simulate", () => {
     expect(result.rows).toEqual([{ action_id: d.action_id, previous_outcome: null, new_outcome: "deny", changed: true }]);
     expect(result.skipped).toBe(1);
   });
+  it("lists the action id of a skipped policy.decided event, distinguishing it from an action that was never decided (regression)", () => {
+    const d = descriptor();
+    const forgedDecision = event("policy.decided", { decision: { action_id: d.action_id, not: "a real decision" } }, 2);
+    const result = simulate([event("action.requested", { descriptor: d }, 1), forgedDecision], bundle);
+    expect(result.rows).toEqual([{ action_id: d.action_id, previous_outcome: null, new_outcome: "deny", changed: true }]);
+    expect(result.skipped).toBe(1);
+    expect(result.skipped_decision_action_ids).toEqual([d.action_id]);
+  });
   it("does not report a conflict from two gated rules alone, matching a no-match decision (regression)", () => {
     const gatedOnly = composeBundles([compileLayer(parseBundle("version: 1\nrules:\n  - id: gated-deny\n    priority: 5\n    match: { labels_any: secret }\n    outcome: deny\n  - id: gated-approve\n    priority: 5\n    match: { signals_any: scope_drift }\n    outcome: require_approval\n"), "t")]);
     const d = descriptor({ labels: ["secret"], run_state: { counters: { actions: 1, sends: 0, denials: 0, approvals: 0, retries: 0 }, spend_minor: 0, elapsed_ms: 10, labels_read: [], signals: [{ code: "scope_drift", basis_points: 5000, reason: "test" }] } });

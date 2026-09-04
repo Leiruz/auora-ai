@@ -10,13 +10,19 @@ import type { DecisionDraft } from "./evaluate.js";
 export interface DecisionIdentifiers { decision_id: string; action_id: string; run_id: string; approval_request_id?: string }
 
 export class MissingApprovalRequestIdError extends Error {
+  readonly code = "MISSING_APPROVAL_REQUEST_ID";
   constructor() {
     super("a require_approval draft cannot be promoted to a Decision without an approval_request_id");
     this.name = "MissingApprovalRequestIdError";
   }
 }
 
-/** Promotes a DecisionDraft (the engine's pure output) to a full Decision by attaching caller-owned identifiers. */
+/**
+ * Promotes a DecisionDraft (the engine's pure output) to a full Decision by attaching caller-owned
+ * identifiers. The returned Decision is unvalidated: `DecisionIdentifiers`' fields are typed `string`
+ * and are not pattern-checked here, so a caller that needs the shape and pattern guarantees (before
+ * writing to the log, for example) must run the result through `validateDecision`.
+ */
 export function promoteDecision(draft: DecisionDraft, ids: DecisionIdentifiers): Decision {
   if (draft.outcome === "require_approval" && ids.approval_request_id === undefined) throw new MissingApprovalRequestIdError();
   return {

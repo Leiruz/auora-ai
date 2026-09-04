@@ -77,12 +77,27 @@ describe("guard tier", () => {
     expect(isProtectedPath("System32/drivers/etc/hosts")).toBe(true);
     expect(isProtectedPath("System32/drivers/etc/networks")).toBe(true);
     expect(isProtectedPath("C:\\Windows\\System32\\drivers\\etc\\hosts")).toBe(true);
-    expect(isProtectedPath("ETC/RESOLV.CONF")).toBe(true);
+    // Relative, with nothing before "etc" either: the same over-block class as the three cases below,
+    // now correctly unprotected since the Unix etc pattern is anchored to an absolute path.
+    expect(isProtectedPath("ETC/RESOLV.CONF")).toBe(false);
     expect(isProtectedPath("/etc/resolv.conf.")).toBe(true);
     expect(isProtectedPath("/etc/resolv.conf ")).toBe(true);
+    // The absolute-path anchor still allows a drive letter and, for macOS's real path of /etc, a
+    // "private/" prefix.
+    expect(isProtectedPath("C:/etc/hosts")).toBe(true);
+    expect(isProtectedPath("/private/etc/hosts")).toBe(true);
+    // Miss: /etc/resolv.conf is commonly a symlink to the systemd-resolved stub resolver on Linux
+    // hosts, and this function's own precondition is a real-path-resolved input.
+    expect(isProtectedPath("/run/systemd/resolve/resolv.conf")).toBe(true);
+    expect(isProtectedPath("/run/systemd/resolve/stub-resolv.conf")).toBe(true);
     expect(guardTier(descriptor({ effect_class: "write", target: { kind: "path", value: "/etc/resolv.conf", scope: "system" } }))?.reason_codes).toEqual(["GUARD_PROTECTED_CONFIG"]);
     expect(isProtectedPath("src/hosts.md")).toBe(false);
     expect(isProtectedPath("myapp/resolv.conf.example")).toBe(false);
     expect(isProtectedPath("notes/hosts")).toBe(false);
+    // Over-block: a relative "etc/" directory anywhere in a project tree is not the real /etc, so an
+    // immutable guard tier that no bundle can open must not deny writing to it.
+    expect(isProtectedPath("myproject/etc/hosts")).toBe(false);
+    expect(isProtectedPath("docker/etc/nsswitch.conf")).toBe(false);
+    expect(isProtectedPath("ansible/roles/base/files/etc/hosts")).toBe(false);
   });
 });
