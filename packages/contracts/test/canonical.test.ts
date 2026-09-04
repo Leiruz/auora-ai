@@ -22,7 +22,7 @@ describe("canonical bytes", () => {
     expect(isDigest(digestOf(a))).toBe(true);
   });
   it("rejects floats, unsafe integers, non NFC strings, non-plain objects and unsupported values before canonicalization", () => {
-    expect(() => assertSignable({ n: 1.5 })).toThrowError(CanonicalError);
+    expect(() => assertSignable({ n: 1.5 })).toThrowError(/NON_INTEGER_NUMBER/);
     expect(() => canonicalJson({ n: 9007199254740992 })).toThrowError(/UNSAFE_INTEGER/);
     expect(() => canonicalJson({ s: "é" })).toThrowError(/NON_NFC_STRING/);
     expect(() => canonicalJson({ u: undefined })).toThrowError(/UNSUPPORTED_VALUE/);
