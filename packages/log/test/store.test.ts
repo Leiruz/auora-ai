@@ -10,7 +10,7 @@ import { recordEffectObserved } from "../src/effects.js";
 import { exportRunJsonl } from "../src/export.js";
 import { FileKeyProvider, MemoryKeyProvider } from "../src/keys.js";
 import { PersistedSigner } from "../src/signer.js";
-import { ChainConflictError, EventStore, ForgedEventError } from "../src/store.js";
+import { ChainConflictError, EventStore } from "../src/store.js";
 
 const RUN = "run_01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const ACT = "act_01ARZ3NDEKTSV4RRFFQ69G5FAW";

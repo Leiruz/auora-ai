@@ -76,14 +76,21 @@ function runVitest(testPath) {
 // as the mutation is reverted. Read by restoreInFlight(), which is also registered below so a Ctrl+C (or a
 // kill) during a vitest run cannot leave a mutated security predicate sitting on disk for `git add -A` to pick up.
 let inFlight = null;
+let interrupted = false;
 function restoreInFlight() {
   if (inFlight) {
     writeFileSync(inFlight.file, inFlight.original);
     inFlight = null;
   }
 }
-process.on("SIGINT", () => { restoreInFlight(); process.exit(130); });
-process.on("SIGTERM", () => { restoreInFlight(); process.exit(143); });
+function handleSignal() {
+  interrupted = true;
+  restoreInFlight();
+  process.exit(130);
+}
+process.on("SIGINT", handleSignal);
+process.on("SIGTERM", handleSignal);
+process.on("SIGHUP", handleSignal);
 process.on("exit", restoreInFlight);
 
 const DISTINCT_TESTS = [...new Set(MUTATIONS.map((m) => m.test))];
@@ -103,6 +110,16 @@ if (ready) {
   console.log(`running ${DISTINCT_TESTS.length} baseline run(s) (unmutated)...`);
   for (const t of DISTINCT_TESTS) {
     const result = runVitest(t);
+    if (result.error) {
+      console.error(`[baseline] ${t} ERROR: ${result.error.message}`);
+      ready = false;
+      break;
+    }
+    if (result.status === null) {
+      console.error(`[baseline] ${t} ERROR: test process was killed by a signal`);
+      ready = false;
+      break;
+    }
     if (result.status === 0) {
       console.log(`[baseline] ${t} OK`);
     } else {
@@ -117,6 +134,8 @@ if (ready) {
 
 let anchorFailures = 0;
 let survivors = 0;
+let errors = 0;
+let completed = 0;
 if (ready) {
   for (const m of MUTATIONS) {
     const original = readFileSync(m.file, "utf8");
@@ -130,7 +149,13 @@ if (ready) {
     try {
       writeFileSync(m.file, original.replace(m.find, m.replace));
       const result = runVitest(m.test);
-      if (result.status === 0) {
+      if (result.error) {
+        console.error(`[${m.name}] ERROR: ${result.error.message}`);
+        errors++;
+      } else if (result.status === null) {
+        console.error(`[${m.name}] ERROR: test process was killed by a signal`);
+        errors++;
+      } else if (result.status === 0) {
         console.error(`[${m.name}] MUTANT SURVIVED: ${m.test} still passes`);
         console.error(result.stdout ?? "");
         if (result.stderr) console.error(result.stderr);
@@ -138,14 +163,26 @@ if (ready) {
       } else {
         console.log(`[${m.name}] killed`);
       }
+      completed++;
     } finally {
       restoreInFlight();
     }
   }
-  if (anchorFailures > 0) console.error(`${anchorFailures} anchor problem(s): nothing was tested for these entries`);
-  if (survivors > 0) console.error(`${survivors} surviving mutant(s): the predicate is not covered`);
-  if (anchorFailures > 0 || survivors > 0) process.exitCode = 1;
-  else console.log(`all ${MUTATIONS.length} mutants killed`);
+  if (interrupted) {
+    console.log(`run interrupted after ${completed} entries`);
+    process.exitCode = 1;
+  } else if (anchorFailures > 0) {
+    console.error(`${anchorFailures} anchor problem(s): nothing was tested for these entries`);
+    if (survivors > 0) console.error(`${survivors} surviving mutant(s): the predicate is not covered`);
+    if (errors > 0) console.error(`${errors} error(s): spawn failed or process was killed`);
+    process.exitCode = 1;
+  } else if (survivors > 0 || errors > 0) {
+    if (survivors > 0) console.error(`${survivors} surviving mutant(s): the predicate is not covered`);
+    if (errors > 0) console.error(`${errors} error(s): spawn failed or process was killed`);
+    process.exitCode = 1;
+  } else {
+    console.log(`all ${MUTATIONS.length} mutants killed`);
+  }
 } else {
   process.exitCode = 1;
 }
