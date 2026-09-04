@@ -17,9 +17,10 @@ import approvalSchema from "../schemas/auora.approval.v1.json" with { type: "jso
 const BASE = "https://auora.dev/schemas/";
 const SCHEMAS = [actionSchema, decisionSchema, hookSchema, capabilitySchema, eventSchema, approvalSchema];
 
-// strictRequired: false because auora.decision.v1.json's "then" requires "approval_request_id",
-// a property declared in the schema's top-level "properties" rather than restated inside "then";
-// that is valid 2020-12 (if/then apply to the same instance) but Ajv's strict linter flags it.
+// strictRequired: false because auora.decision.v1.json's "then" requires "approval_request_id", and
+// auora.capability.v1.json's result "then"/"else" require/forbid "error"/"data": properties declared
+// in the schema's top-level "properties" rather than restated inside "then"/"else"; that is valid
+// 2020-12 (if/then/else apply to the same instance) but Ajv's strict linter flags it.
 const ajv = new Ajv2020({ strict: true, allErrors: true, strictRequired: false });
 addFormats(ajv);
 for (const schema of SCHEMAS) ajv.addSchema(schema as object);

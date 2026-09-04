@@ -19,7 +19,12 @@
     "ttl_ms": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" }
   },
   "if": { "type": "object", "properties": { "outcome": { "type": "string", "const": "require_approval" } } },
-  "then": { "required": ["approval_request_id"] },
+  "then": { "type": "object", "required": ["approval_request_id"], "properties": { "obligations": { "type": "array", "maxItems": 0 } } },
+  "else": {
+    "type": "object",
+    "if": { "type": "object", "properties": { "outcome": { "type": "string", "const": "allow" } } },
+    "else": { "type": "object", "properties": { "obligations": { "type": "array", "maxItems": 0 } } }
+  },
   "$defs": {
     "obligation": { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "type": "string", "enum": ["redact_fields", "max_response_bytes", "record_payload_digest", "notify"] }, "fields": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 128 } }, "max_bytes": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }, "channel": { "type": "string", "minLength": 1, "maxLength": 64 } } }
   }

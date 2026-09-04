@@ -64,7 +64,9 @@ export interface HookEvent {
 }
 export interface HookResponse { schema_version: "auora.hook/1"; kind: "response"; decision: "allow" | "deny" | "ask"; reason: string; action_id?: string }
 export interface CapabilityCall { schema_version: "auora.capability/1"; kind: "call"; run_id: string; capability: string; method: string; args: { [key: string]: JsonValue }; seq: number; isolate_execution_id: string }
-export interface CapabilityResult { schema_version: "auora.capability/1"; kind: "result"; ok: boolean; data?: { [key: string]: JsonValue }; error?: { code: string; message: string }; labels: Label[]; size_bytes: number }
+export type CapabilityResult =
+  | { schema_version: "auora.capability/1"; kind: "result"; ok: true; data?: { [key: string]: JsonValue }; labels: Label[]; size_bytes: number }
+  | { schema_version: "auora.capability/1"; kind: "result"; ok: false; error: { code: string; message: string }; labels: Label[]; size_bytes: number };
 export interface EventEnvelope {
   schema_version: "auora.event/1"; event_id: string; run_id: string; seq: number; type: EventType;
   occurred_at: string; coverage: Coverage; prev_hash: Digest | "GENESIS"; payload: { [key: string]: JsonValue };

@@ -44,6 +44,13 @@ describe("policy/contracts seam", () => {
     });
   });
 
+  it("cannot produce a decision that the tightened non-allow-obligations conditional rejects", () => {
+    const deny = promoteDecision(evaluate(GOLDEN_DENY, bundle), { decision_id: DECISION_IDS[0]!, action_id: GOLDEN_DENY.action_id, run_id: GOLDEN_DENY.run_id });
+    const allow = promoteDecision(evaluate(GOLDEN_ALLOW, bundle), { decision_id: DECISION_IDS[1]!, action_id: GOLDEN_ALLOW.action_id, run_id: GOLDEN_ALLOW.run_id });
+    expect(validateDecision(deny).ok).toBe(true);
+    expect(validateDecision(allow).ok).toBe(true);
+  });
+
   it("throws MissingApprovalRequestIdError, carrying a code like the branch's other error types, when a require_approval draft is promoted without an approval request id", () => {
     const draft = evaluate(GOLDEN_APPROVAL, bundle);
     expect(draft.outcome).toBe("require_approval");
