@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import canonicalize from "canonicalize";
-import { CanonicalError, assertSignable, canonicalJson, digestOf, digestWithout, isDigest } from "../src/canonical.js";
+import { assertSignable, canonicalJson, digestOf, digestWithout, isDigest } from "../src/canonical.js";
 
 interface Fixture { name: string; input: unknown; canonical: string; digest?: string }
 const fixtures = JSON.parse(readFileSync(new URL("./fixtures/canonical.json", import.meta.url), "utf8")) as Fixture[];
