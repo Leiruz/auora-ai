@@ -46,9 +46,9 @@ describe("event store", () => {
     // A wrong prev_hash on an unsigned mutation is a forged record, so the stale-writer case must be built and signed to reach the compare-and-swap.
     await expect(store.append(await buildEvent({ run_id: RUN, type: "run.terminated", occurred_at: "2026-09-02T10:00:01Z", coverage: "protected", payload: { reason: "TEST" } }, D as EventEnvelope["prev_hash"], 1, pair))).rejects.toThrow(ChainConflictError);
     await expect(store.append({ ...e1, payload: { ...e1.payload, extra: 1 } })).rejects.toThrow(/invalid event/);
-    await expect(store.append({ ...e1, payload: { reason: "FORGED" } })).rejects.toThrow(ForgedEventError);
-    await expect(store.append({ ...e1, signature: "B".repeat(86) })).rejects.toThrow(ForgedEventError);
-    await expect(EventStore.memory(new Map()).append(e0)).rejects.toThrow(ForgedEventError);
+    await expect(store.append({ ...e1, payload: { reason: "FORGED" } })).rejects.toThrow(/forged event: HASH_MISMATCH/);
+    await expect(store.append({ ...e1, signature: "B".repeat(86) })).rejects.toThrow(/forged event: SIGNATURE_INVALID/);
+    await expect(EventStore.memory(new Map()).append(e0)).rejects.toThrow(/forged event: UNKNOWN_KEY/);
     expect(store.head(RUN)).toEqual({ seq: 0, hash: e0.event_hash });
     expect(store.list(RUN)).toHaveLength(1);
   });
