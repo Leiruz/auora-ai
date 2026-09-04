@@ -4,3 +4,5 @@ export * from "./guard.js";
 export * from "./evaluate.js";
 export * from "./explain.js";
 export * from "./simulate.js";
+export * from "./decision.js";
+export * from "./load.js";

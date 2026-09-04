@@ -23,8 +23,16 @@ describe("explain and simulate", () => {
     const d = descriptor({ target: { kind: "path", value: "src/a.ts", scope: "external" } });
     const decision = { schema_version: "auora.decision/1", decision_id: "dec_01ARZ3NDEKTSV4RRFFQ69G5FAX", action_id: d.action_id, run_id: d.run_id, outcome: "allow", tier: "policy", reason_codes: ["POLICY_RULE_MATCHED"], matched_rule_ids: ["t:allow-read"], policy_digest: bundle.digest, obligations: [], ttl_ms: 5000 };
     const rows = simulate([event("action.requested", { descriptor: d }, 1), event("policy.decided", { decision }, 2)], stricter);
-    expect(rows).toEqual([{ action_id: d.action_id, previous_outcome: "allow", new_outcome: "deny", changed: true }]);
-    expect(simulate([event("action.requested", { descriptor: d }, 1)], bundle)).toEqual([{ action_id: d.action_id, previous_outcome: null, new_outcome: "allow", changed: true }]);
+    expect(rows.rows).toEqual([{ action_id: d.action_id, previous_outcome: "allow", new_outcome: "deny", changed: true }]);
+    expect(rows.skipped).toBe(0);
+    expect(simulate([event("action.requested", { descriptor: d }, 1)], bundle).rows).toEqual([{ action_id: d.action_id, previous_outcome: null, new_outcome: "allow", changed: true }]);
+  });
+  it("skips a malformed stored event instead of throwing out of guardTier (regression)", () => {
+    const d = descriptor();
+    const malformed = event("action.requested", { descriptor: { not: "a real descriptor" } }, 2);
+    const result = simulate([event("action.requested", { descriptor: d }, 1), malformed], bundle);
+    expect(result.rows).toEqual([{ action_id: d.action_id, previous_outcome: null, new_outcome: "deny", changed: true }]);
+    expect(result.skipped).toBe(1);
   });
   it("does not report a conflict from two gated rules alone, matching a no-match decision (regression)", () => {
     const gatedOnly = composeBundles([compileLayer(parseBundle("version: 1\nrules:\n  - id: gated-deny\n    priority: 5\n    match: { labels_any: secret }\n    outcome: deny\n  - id: gated-approve\n    priority: 5\n    match: { signals_any: scope_drift }\n    outcome: require_approval\n"), "t")]);
@@ -58,6 +66,6 @@ describe("explain and simulate", () => {
     const d = descriptor({ target: { kind: "path", value: "src/a.ts", scope: "external" } });
     const decision = { schema_version: "auora.decision/1", decision_id: "dec_01ARZ3NDEKTSV4RRFFQ69G5FAY", action_id: d.action_id, run_id: d.run_id, outcome: "allow", tier: "policy", reason_codes: ["POLICY_RULE_MATCHED"], matched_rule_ids: ["t:allow-read"], policy_digest: bundle.digest, obligations: [], ttl_ms: 5000 };
     const rows = simulate([event("action.requested", { descriptor: d }, 1), event("policy.decided", { decision }, 2)], bundle);
-    expect(rows).toEqual([{ action_id: d.action_id, previous_outcome: "allow", new_outcome: "allow", changed: false }]);
+    expect(rows.rows).toEqual([{ action_id: d.action_id, previous_outcome: "allow", new_outcome: "allow", changed: false }]);
   });
 });

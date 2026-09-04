@@ -1,8 +1,9 @@
 // packages/policy/test/golden.test.ts
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { compileLayer, composeBundles, loadLayerFile, parseBundle } from "../src/compile.js";
+import { compileLayer, composeBundles, parseBundle } from "../src/compile.js";
 import { evaluate } from "../src/evaluate.js";
+import { loadLayerFile } from "../src/load.js";
 import { descriptor } from "./helpers.js";
 
 const bundle = composeBundles([

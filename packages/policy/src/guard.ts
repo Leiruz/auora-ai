@@ -9,6 +9,9 @@ export const PROTECTED_PATH_PATTERNS: readonly RegExp[] = Object.freeze([
   /(^|[\\/])\.codex([\\/]|$)/i,
   /(^|[\\/])\.(claude|mcp)\.json[. ]*$/i,
   /(^|[\\/])(\.bashrc|\.bash_profile|\.zshrc|\.zprofile|\.profile|\.zshenv|\.bash_login|\.zlogin|Microsoft\.PowerShell_profile\.ps1|profile\.ps1)[. ]*$/i,
+  /(^|[\\/])etc[\\/](resolv\.conf|hosts|nsswitch\.conf)[. ]*$/i,
+  /(^|[\\/])etc[\\/]systemd[\\/]resolved\.conf[. ]*$/i,
+  /(^|[\\/])system32[\\/]drivers[\\/]etc[\\/](hosts|networks)[. ]*$/i,
   /^auora:\/\//i,
 ]);
 

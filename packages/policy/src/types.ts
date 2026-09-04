@@ -25,7 +25,7 @@ export interface CompiledRule { id: string; layer: string; qualified_id: string;
 export interface CompiledLayer { name: string; digest: Digest; ttl_ms: number | null; rules: CompiledRule[] }
 export interface CompiledBundle { digest: Digest; layers: { name: string; digest: Digest }[]; ttl_ms: number; rules: CompiledRule[] }
 
-export const POLICY_ERROR_CODES = ["SCHEMA", "INVALID_VALUE", "DUPLICATE_RULE_ID", "INVALID_PATTERN", "INVALID_DOMAIN", "ALLOW_GUARDED_EFFECT", "ALLOW_LABEL_MATCHER", "SIGNAL_RULE_ALLOWS", "ALLOW_WITHOUT_EFFECT"] as const;
+export const POLICY_ERROR_CODES = ["SCHEMA", "INVALID_VALUE", "DUPLICATE_RULE_ID", "INVALID_PATTERN", "INVALID_DOMAIN", "ALLOW_GUARDED_EFFECT", "ALLOW_LABEL_MATCHER", "SIGNAL_RULE_ALLOWS", "ALLOW_WITHOUT_EFFECT", "UNMATCHABLE_PATH_PATTERN"] as const;
 export type PolicyErrorCode = (typeof POLICY_ERROR_CODES)[number];
 export class PolicyCompileError extends Error {
   constructor(public readonly code: PolicyErrorCode, public readonly detail: string) {

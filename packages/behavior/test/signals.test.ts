@@ -1,5 +1,6 @@
 // packages/behavior/test/signals.test.ts
 import { describe, expect, it } from "vitest";
+import { validateAction, type ActionDescriptor, type Signal } from "@auora/contracts";
 import { computeSignals, type CurrentAction, type HistoryEntry, type RunProfile } from "../src/signals.js";
 
 const D = ("sha256:" + "a".repeat(64)) as HistoryEntry["descriptor_digest"];
@@ -8,6 +9,14 @@ const entry = (seq: number, over: Partial<HistoryEntry> = {}): HistoryEntry => (
 const current = (over: Partial<CurrentAction> = {}): CurrentAction => ({ effect_class: "read", target_scope: "workspace", is_lookup: false, labels_read: [], descriptor_digest: D, ...over });
 const profile: RunProfile = { allowed_domains: ["registry.npmjs.org"], allowed_scopes: ["workspace", "external"] };
 const codes = (s: { code: string }[]) => s.map((x) => x.code);
+const descriptorCarrying = (signal: Signal): ActionDescriptor => ({
+  schema_version: "auora.action/1", action_id: "act_01ARZ3NDEKTSV4RRFFQ69G5FAW", run_id: "run_01ARZ3NDEKTSV4RRFFQ69G5FAV", seq: 1,
+  agent: { kind: "claude-code", version: "1" }, source: "resolver", effect_class: "read", risk_class: "medium",
+  target: { kind: "name", value: "x.attacker.example", scope: "external" }, labels: [],
+  command_digest: D, argument_digest: D,
+  run_state: { counters: { actions: 1, sends: 0, denials: 0, approvals: 0, retries: 0 }, spend_minor: 0, elapsed_ms: 10, labels_read: [], signals: [signal] },
+  descriptor_digest: D,
+});
 
 describe("behavior signals", () => {
   it("flags a destination or looked-up name not in the profile or the run so far, once", () => {
@@ -63,6 +72,14 @@ describe("behavior signals", () => {
     expect(codes(computeSignals([], current({ approved_digest: E }), profile))).toContain("post_approval_mutation");
     expect(codes(computeSignals([], current({ approved_digest: D }), profile))).not.toContain("post_approval_mutation");
     expect(codes(computeSignals([], current(), profile))).not.toContain("post_approval_mutation");
+  });
+  it("bounds a long looked-up destination's reason to the contracts schema cap (tunnelling shape)", () => {
+    const longDestination = "a".repeat(300) + ".attacker.example";
+    const signal = computeSignals([], current({ is_lookup: true, destination: longDestination }), profile).find((s) => s.code === "new_destination");
+    expect(signal).toBeDefined();
+    expect(signal!.reason.length).toBeLessThanOrEqual(256);
+    expect(signal!.reason.startsWith("NEW_DESTINATION:")).toBe(true);
+    expect(validateAction(descriptorCarrying(signal!)).ok).toBe(true);
   });
   it("is deterministic and never exceeds 10000 basis points", () => {
     const history = Array.from({ length: 30 }, (_, i) => entry(i + 1, { outcome: "deny", target_scope: "system" }));

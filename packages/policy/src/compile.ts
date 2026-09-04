@@ -1,21 +1,22 @@
 // packages/policy/src/compile.ts
-import { readFileSync } from "node:fs";
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import { parseDocument } from "yaml";
 import { AGENT_KINDS, CanonicalError, DESTINATION_CLASSES, EFFECT_CLASSES, HTTP_METHODS, LABELS, OBLIGATION_TYPES, RISK_CLASSES, SIGNAL_CODES, SOURCES, TARGET_KINDS, TARGET_SCOPES, digestOf, type Digest, type Obligation } from "@auora/contracts";
+import policySchema from "../schemas/policy.v1.json";
 import { PolicyCompileError, type BundleSpec, type CompiledBundle, type CompiledLayer, type CompiledMatcher, type CompiledRule, type ObligationSpec, type RuleSpec, type StrOrList } from "./types.js";
 
 export { PolicyCompileError } from "./types.js";
 
-// I/O in this package is confined to load-time functions (parseBundle, loadLayerFile, and
-// the lazy schema validator below); the evaluation path (later modules) performs none.
+// This module performs no I/O: the schema above is a static import (bundled at build time, not read
+// from disk at runtime), so a Worker can import evaluate and the rest of the pure surface without
+// pulling node:fs into its bundle. The one filesystem-touching function, loadLayerFile, lives in
+// ./load.js instead; the evaluation path (later modules) performs no I/O either.
 type BundleValidator = { ajv: Ajv2020; validate: ValidateFunction };
 let cachedValidator: BundleValidator | undefined;
 function bundleValidator(): BundleValidator {
   if (!cachedValidator) {
-    const schema = JSON.parse(readFileSync(new URL("../schemas/policy.v1.json", import.meta.url), "utf8")) as object;
     const ajv = new Ajv2020({ strict: true, allErrors: true });
-    cachedValidator = { ajv, validate: ajv.compile(schema) };
+    cachedValidator = { ajv, validate: ajv.compile(policySchema) };
   }
   return cachedValidator;
 }
@@ -117,6 +118,10 @@ export function compileLayer(spec: BundleSpec, name: string): CompiledLayer {
     }
     const patterns = list(m.path_pattern);
     if (patterns) c.path_pattern = patterns.map(compilePathPattern);
+    // path_pattern is matched only against canonical_path (a vault-request field, spec 5.5). A rule that
+    // also names target_kind: path can never match, since a path target never carries a canonical_path;
+    // for a deny rule that is a policy-weakening primitive, so it is rejected at compile time.
+    if (c.path_pattern && c.target_kind?.has("path")) throw new PolicyCompileError("UNMATCHABLE_PATH_PATTERN", rule.id);
     const tools = list(m.tool_name);
     if (tools) c.tool_name = new Set(tools);
     if (m.counters) c.counters = { ...m.counters };
@@ -136,8 +141,4 @@ export function composeBundles(layers: CompiledLayer[]): CompiledBundle {
   for (const layer of layers) if (layer.ttl_ms !== null) ttl = layer.ttl_ms;
   const summary = layers.map((l) => ({ name: l.name, digest: l.digest }));
   return { digest: digestOf({ layers: summary }), layers: summary, ttl_ms: ttl, rules: layers.flatMap((l) => l.rules) };
-}
-
-export function loadLayerFile(path: string, name: string): CompiledLayer {
-  return compileLayer(parseBundle(readFileSync(path, "utf8")), name);
 }

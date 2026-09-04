@@ -69,4 +69,20 @@ describe("guard tier", () => {
     expect(guardTier(descriptor({ effect_class: "write", target: { kind: "path", value: "auora://config/daemon.toml", scope: "workspace" } }))?.reason_codes).toEqual(["GUARD_PROTECTED_CONFIG"]);
     expect(guardTier(descriptor({ effect_class: "read", target: { kind: "path", value: "notes.txt", scope: "workspace", attributes: ["file_payload_reference"] } }))?.reason_codes).toEqual(["GUARD_FILE_PAYLOAD_REFERENCE"]);
   });
+  it("protects name resolution and proxy configuration files (spec 5.3)", () => {
+    expect(isProtectedPath("/etc/resolv.conf")).toBe(true);
+    expect(isProtectedPath("/etc/hosts")).toBe(true);
+    expect(isProtectedPath("/etc/nsswitch.conf")).toBe(true);
+    expect(isProtectedPath("/etc/systemd/resolved.conf")).toBe(true);
+    expect(isProtectedPath("System32/drivers/etc/hosts")).toBe(true);
+    expect(isProtectedPath("System32/drivers/etc/networks")).toBe(true);
+    expect(isProtectedPath("C:\\Windows\\System32\\drivers\\etc\\hosts")).toBe(true);
+    expect(isProtectedPath("ETC/RESOLV.CONF")).toBe(true);
+    expect(isProtectedPath("/etc/resolv.conf.")).toBe(true);
+    expect(isProtectedPath("/etc/resolv.conf ")).toBe(true);
+    expect(guardTier(descriptor({ effect_class: "write", target: { kind: "path", value: "/etc/resolv.conf", scope: "system" } }))?.reason_codes).toEqual(["GUARD_PROTECTED_CONFIG"]);
+    expect(isProtectedPath("src/hosts.md")).toBe(false);
+    expect(isProtectedPath("myapp/resolv.conf.example")).toBe(false);
+    expect(isProtectedPath("notes/hosts")).toBe(false);
+  });
 });

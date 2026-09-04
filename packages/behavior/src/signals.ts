@@ -10,6 +10,21 @@ export interface RunProfile { allowed_domains: readonly string[]; allowed_scopes
 
 export const WINDOW = 20;
 
+// The action schema caps signal.reason at 256 characters (packages/contracts/schemas/auora.action.v1.json),
+// but current.destination is attacker-controlled (a looked-up name or connection target) and can be far
+// longer, notably on the long-encoded-subdomain shape that indicates DNS tunnelling. Truncate rather than
+// let the signal become schema-invalid on exactly the shape it exists to flag.
+const REASON_MAX_LENGTH = 256;
+const TRUNCATION_MARKER = "...TRUNCATED";
+
+function newDestinationReason(destination: string): string {
+  const prefix = "NEW_DESTINATION:";
+  const full = `${prefix}${destination}`;
+  if (full.length <= REASON_MAX_LENGTH) return full;
+  const room = REASON_MAX_LENGTH - prefix.length - TRUNCATION_MARKER.length;
+  return `${prefix}${destination.slice(0, room)}${TRUNCATION_MARKER}`;
+}
+
 function spanMs(entries: readonly HistoryEntry[]): number {
   const first = entries[0]; const last = entries[entries.length - 1];
   if (!first || !last) return 0;
@@ -21,7 +36,7 @@ export function computeSignals(history: readonly HistoryEntry[], current: Curren
   if (current.destination !== undefined) {
     const seen = new Set(history.map((h) => h.destination).filter((d): d is string => d !== undefined));
     if (!profile.allowed_domains.includes(current.destination) && !seen.has(current.destination)) {
-      signals.push({ code: "new_destination", basis_points: 10000, reason: `NEW_DESTINATION:${current.destination}` });
+      signals.push({ code: "new_destination", basis_points: 10000, reason: newDestinationReason(current.destination) });
     }
   }
   if ((current.effect_class === "send" || current.is_lookup) && current.labels_read.some((l) => l === "confidential" || l === "secret")) {

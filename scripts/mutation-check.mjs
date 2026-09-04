@@ -22,6 +22,7 @@ const CANONICAL_TEST = "packages/contracts/test/canonical.test.ts";
 const MUTATIONS = [
   { name: "guard tier disabled", file: POLICY_EVAL, find: "const guard = guardTier(d);", replace: "const guard = null;", test: GOLDEN },
   { name: "conflict detection removed", file: POLICY_EVAL, find: 'if (outcomes.size > 1) { outcome = "deny"; reasons.push("POLICY_CONFLICT"); }', replace: "if (false) {}", test: GOLDEN },
+  { name: "isGated always false (gated rules rejoin the priority contest)", file: POLICY_EVAL, find: "  return m.labels_any !== undefined || m.labels_read_any !== undefined || m.signals_any !== undefined;", replace: "  return false;", test: GOLDEN },
   { name: "secret exfiltration guard removed", file: POLICY_GUARD, find: 'if (leaves && labels.has("secret")) return deny("GUARD_SECRET_EXFILTRATION", "guard:secret-exfiltration");', replace: "", test: GUARD_TEST },
   { name: "protected config guard removed", file: POLICY_GUARD, find: 'if ((d.effect_class === "write" || d.effect_class === "delete") && d.target.kind === "path" && isProtectedPath(d.target.value)) return deny("GUARD_PROTECTED_CONFIG", "guard:protected-config");', replace: "", test: GUARD_TEST },
   { name: "privilege change guard removed", file: POLICY_GUARD, find: 'if (d.effect_class === "privilege_change") return deny("GUARD_PRIVILEGE_CHANGE", "guard:privilege-change");', replace: "", test: GUARD_TEST },

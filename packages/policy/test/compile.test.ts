@@ -1,7 +1,9 @@
 // packages/policy/test/compile.test.ts
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { compileLayer, compilePathPattern, composeBundles, loadLayerFile, parseBundle, PolicyCompileError } from "../src/compile.js";
+import { compileLayer, compilePathPattern, composeBundles, parseBundle, PolicyCompileError } from "../src/compile.js";
+import { loadLayerFile } from "../src/load.js";
 
 const EXAMPLE = fileURLToPath(new URL("../policies/example.yaml", import.meta.url));
 const DEFAULTS = fileURLToPath(new URL("../policies/defaults.yaml", import.meta.url));
@@ -54,6 +56,9 @@ describe("policy compiler", () => {
     expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { effect: "send", signals_any: "scope_drift" }, outcome: "allow" }] }, "t"))).toBe("SIGNAL_RULE_ALLOWS");
     expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { effect: "privilege_change" }, outcome: "allow" }] }, "t"))).toBe("ALLOW_GUARDED_EFFECT");
     expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { target_scope: "workspace" }, outcome: "allow" }] }, "t"))).toBe("ALLOW_WITHOUT_EFFECT");
+    // path_pattern is tested only against the descriptor's canonical_path, a vault-request field that a
+    // target_kind: path descriptor never carries, so this combination can never match (deny rules included).
+    expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { target_kind: "path", path_pattern: "/etc/*" }, outcome: "deny" }] }, "t"))).toBe("UNMATCHABLE_PATH_PATTERN");
     expect(code(() => compileLayer({ version: 1, rules: [{ id: "a-rule", priority: 1, match: { effect: [ "write", "delete" ], target_scope: "workspace" }, outcome: "allow" }] }, "t"))).toBe("OK");
     expect(code(() => parseBundle("version: 2\nrules: []\n"))).toBe("SCHEMA");
     expect(code(() => parseBundle("version: 1\nrules:\n  - id: a-rule\n    priority: 1.5\n    match: { effect: send }\n    outcome: deny\n"))).toBe("SCHEMA");
@@ -64,5 +69,9 @@ describe("policy compiler", () => {
     expect(code(() => parseBundle(anchorBomb))).toBe("SCHEMA");
     expect(code(() => parseBundle("%YAML 1.1\n---\nversion: 1\nrules: []\n"))).toBe("SCHEMA");
     expect(code(() => parseBundle("version: 1\nrules: []\n"))).toBe("OK");
+  });
+  it("keeps the compiler module free of node:fs, so a Worker can import evaluate without pulling in the loader", () => {
+    const source = readFileSync(fileURLToPath(new URL("../src/compile.ts", import.meta.url)), "utf8");
+    expect(source).not.toMatch(/from ["']node:fs["']/);
   });
 });
