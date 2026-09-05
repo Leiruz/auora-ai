@@ -12,3 +12,7 @@ coverage/
 Thumbs.db
 .tri/
 .worktrees/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.auora-keys/

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auora.dev/schemas/auora.capability.v1.json",
+  "oneOf": [{ "$ref": "#/$defs/call" }, { "$ref": "#/$defs/result" }],
+  "$defs": {
+    "call": {
+      "type": "object", "additionalProperties": false, "required": ["schema_version", "kind", "run_id", "capability", "method", "args", "seq", "isolate_execution_id"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "auora.capability/1" }, "kind": { "type": "string", "const": "call" },
+        "run_id": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/run_id" },
+        "capability": { "type": "string", "pattern": "^[a-z][a-z0-9_.]{0,63}$" }, "method": { "type": "string", "pattern": "^[a-z][A-Za-z0-9_]{0,63}$" },
+        "args": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/json_object" },
+        "seq": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" },
+        "isolate_execution_id": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "result": {
+      "type": "object", "additionalProperties": false, "required": ["schema_version", "kind", "ok", "labels", "size_bytes"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "auora.capability/1" }, "kind": { "type": "string", "const": "result" }, "ok": { "type": "boolean" },
+        "data": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/json_object" },
+        "error": { "type": "object", "additionalProperties": false, "required": ["code", "message"], "properties": { "code": { "type": "string", "pattern": "^[A-Z0-9_]{3,64}$" }, "message": { "type": "string", "maxLength": 512 } } },
+        "labels": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/label_set" },
+        "size_bytes": { "$ref": "https://auora.dev/schemas/auora.action.v1.json#/$defs/count" }
+      },
+      "if": { "type": "object", "properties": { "ok": { "type": "boolean", "const": true } } },
+      "then": { "not": { "required": ["error"] } },
+      "else": { "required": ["error"], "not": { "required": ["data"] } }
+    }
+  }
+}

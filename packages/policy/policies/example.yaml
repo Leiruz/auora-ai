@@ -1,0 +1,19 @@
+version: 1
+rules:
+  - id: approve-destructive-outside
+    priority: 90
+    match: { effect: delete, target_scope: outside_workspace }
+    outcome: require_approval
+  - id: throttle-sends
+    priority: 50
+    match: { effect: send, counters: { sends_gte: 3 } }
+    outcome: throttle
+  - id: allow-github-api-pulls
+    priority: 10
+    match: { effect: send, destination_class: vault, destination: api.github.com, method: POST, path_pattern: /repos/Leiruz/*/pulls }
+    outcome: allow
+    obligations: [record_payload_digest]
+  - id: allow-npm-registry
+    priority: 10
+    match: { effect: send, destination: registry.npmjs.org }
+    outcome: allow
